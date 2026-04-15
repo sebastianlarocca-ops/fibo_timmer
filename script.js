@@ -586,7 +586,7 @@ function initFibExerciseListsUi() {
 // ---------------------------------------------------------------------------
 
 /** Base URL of the Express backend. Change this to your Render URL when deployed. */
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "https://fibo-workout-backend.onrender.com";
 
 /**
  * POST the current exercise lists + timestamp to /api/workouts.
