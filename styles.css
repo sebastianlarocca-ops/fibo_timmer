@@ -604,46 +604,6 @@ button:disabled {
   border-color: rgba(37, 99, 235, 0.35);
 }
 
-/* Export / Import routine controls */
-.fib-io-controls {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  margin: 0.65rem 0 0;
-}
-
-.fib-io-btn {
-  flex: 0 0 auto;
-  padding: 0.38rem 0.75rem;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  color: var(--muted);
-  background: rgba(30, 41, 59, 0.6);
-  cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
-}
-
-.fib-io-btn:hover:enabled {
-  background: rgba(51, 65, 85, 0.85);
-  border-color: rgba(148, 163, 184, 0.5);
-  color: var(--text);
-  transform: none;
-}
-
-.fib-io-feedback {
-  text-align: right;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--rest);
-  margin: 0.2rem 0 0;
-}
-
-.fib-io-feedback--error {
-  color: var(--work);
-}
 
 @media (max-width: 768px) {
   .app-layout {

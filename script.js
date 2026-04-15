@@ -633,102 +633,6 @@ function loadFromLocalStorage() {
   loadFibExerciseListsFromStorage();
 }
 
-// --- Export to TXT ---
-
-function exportToTXT() {
-  const sections = [
-    { label: "CORE", type: "core" },
-    { label: "BODYWEIGHT", type: "bodyweight" },
-    { label: "OVERLOAD", type: "overload" },
-  ];
-  const lines = [];
-  sections.forEach(({ label, type }, i) => {
-    if (i > 0) lines.push("");
-    lines.push(`${label}:`);
-    fibExerciseLists[type].forEach((ex) => lines.push(ex));
-  });
-  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "routine.txt";
-  a.click();
-  URL.revokeObjectURL(url);
-  showFibIOFeedback("Routine exported!");
-}
-
-// --- Import from TXT ---
-
-function parseTXTRoutine(text) {
-  const result = { core: [], bodyweight: [], overload: [] };
-  const sectionMap = { CORE: "core", BODYWEIGHT: "bodyweight", OVERLOAD: "overload" };
-  let current = null;
-  text.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    if (trimmed.endsWith(":")) {
-      const key = trimmed.slice(0, -1).toUpperCase();
-      if (sectionMap[key]) { current = sectionMap[key]; return; }
-    }
-    if (current) result[current].push(trimmed);
-  });
-  return result;
-}
-
-function importFromTXT(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const parsed = parseTXTRoutine(e.target.result);
-      const hasContent = FIB_BLOCK_TYPES.some((t) => parsed[t].length > 0);
-      if (!hasContent) { showFibIOFeedback("No valid sections found.", true); return; }
-      FIB_BLOCK_TYPES.forEach((type) => {
-        fibExerciseLists[type].length = 0;
-        parsed[type].forEach((ex) => fibExerciseLists[type].push(ex));
-      });
-      saveToLocalStorage();
-      FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
-      refreshFibWorkoutExerciseDisplay();
-      showFibIOFeedback("Routine imported!");
-    } catch {
-      showFibIOFeedback("Invalid file format.", true);
-    }
-  };
-  reader.readAsText(file);
-}
-
-// --- IO feedback banner ---
-
-function showFibIOFeedback(msg, isError = false) {
-  const el = document.getElementById("fibIOFeedback");
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `fib-io-feedback${isError ? " fib-io-feedback--error" : ""}`;
-  el.hidden = false;
-  clearTimeout(el._hideTimer);
-  el._hideTimer = setTimeout(() => { el.hidden = true; el.textContent = ""; }, 2500);
-}
-
-// --- Wire Export / Import buttons ---
-
-function initFibIO() {
-  const exportBtn = document.getElementById("fibExportBtn");
-  const importBtn = document.getElementById("fibImportBtn");
-  const importFile = document.getElementById("fibImportFile");
-
-  if (exportBtn) exportBtn.addEventListener("click", exportToTXT);
-  if (importBtn && importFile) {
-    importBtn.addEventListener("click", () => importFile.click());
-    importFile.addEventListener("change", () => {
-      if (importFile.files && importFile.files[0]) {
-        importFromTXT(importFile.files[0]);
-        importFile.value = "";
-      }
-    });
-  }
-}
-
 // --- Tabata: configurable sequence from inputs ---
 const tabWork = document.getElementById("tabWork");
 const tabRest = document.getElementById("tabRest");
@@ -965,7 +869,6 @@ window.addEventListener("appinstalled", () => {
 });
 
 initFibExerciseListsUi();
-initFibIO();
 
 // Initial paint
 fibonacciResetUi();
