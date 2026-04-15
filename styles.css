@@ -1,0 +1,657 @@
+:root {
+  --bg: #0f172a;
+  --card: rgba(15, 23, 42, 0.72);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --work: #ef4444;
+  --rest: #22c55e;
+  --done: #8b5cf6;
+  --accent: #38bdf8;
+
+  /* Tabata palette (blue / yellow) */
+  --tab-work: #2563eb;
+  --tab-rest: #eab308;
+  --tab-done: #0ea5e9;
+  --tab-accent: #fde047;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.app-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top, #1e293b, var(--bg));
+}
+
+/**
+ * PWA install affordance (shown when browser fires beforeinstallprompt).
+ */
+.btn-install-app {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  color: #0f172a;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.35);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.btn-install-app:hover {
+  transform: translateX(-50%) translateY(-1px);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
+}
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 1rem;
+}
+
+.main-area {
+  position: relative;
+  flex: 1 1 420px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 0.5rem;
+}
+
+.fibonacci-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- Tabata: overlay + drawer (fixed siblings; never alter body layout/background) --- */
+
+.tabata-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.tabata-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tabata-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  max-width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.98);
+  border-left: 1px solid rgba(37, 99, 235, 0.35);
+  box-shadow: -8px 0 28px rgba(2, 6, 23, 0.25);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.tabata-drawer.open {
+  transform: translateX(0);
+}
+
+.tabata-drawer__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.tabata-drawer__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tabata-drawer__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text);
+  background: rgba(30, 41, 59, 0.9);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+/* Drawer header is not a flex row of equal buttons — override global `button { flex: 1 }`. */
+.tabata-drawer__header .tabata-drawer__close {
+  flex: 0 0 auto;
+}
+
+.tabata-drawer__close:hover {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(30, 58, 138, 0.45);
+}
+
+.tabata-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem 1rem 1.25rem;
+  touch-action: pan-y;
+}
+
+.tabata-drawer-open {
+  position: fixed;
+  right: 1rem;
+  bottom: 1.25rem;
+  z-index: 1002;
+  border: 1px solid rgba(37, 99, 235, 0.5);
+  border-radius: 999px;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #e2e8f0;
+  background: linear-gradient(160deg, rgba(30, 58, 138, 0.95), rgba(29, 78, 216, 0.88));
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tabata-drawer-open:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.55);
+}
+
+.tabata-drawer-open:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .tabata-drawer {
+    width: 100%;
+  }
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 2rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 35px rgba(2, 6, 23, 0.35);
+  transition: background 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
+}
+
+.card--fibonacci {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.card--tabata {
+  max-width: 100%;
+  padding: 1.25rem 1.35rem;
+  border: 2px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.tabata-heading {
+  margin: 0 0 0.85rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #93c5fd;
+}
+
+.tabata-config {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tabata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tabata-field input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.4rem 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.tabata-field input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.55);
+  outline-offset: 1px;
+}
+
+.tabata-field input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.phase--tabata {
+  font-size: 1.05rem;
+}
+
+.time--tabata {
+  font-size: clamp(1.75rem, 6vw, 2.6rem);
+}
+
+.progress-wrap--tabata {
+  height: 10px;
+  margin-top: 0.25rem;
+}
+
+.controls--tabata {
+  margin-top: 1rem;
+}
+
+.controls--tabata button {
+  padding: 0.55rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+h1 {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.phase {
+  margin: 0;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.time {
+  margin: 0.3rem 0 0;
+  text-align: center;
+  font-size: clamp(2.5rem, 10vw, 4rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.block {
+  text-align: center;
+  margin: 0.6rem 0 1.4rem;
+  color: var(--muted);
+}
+
+.fib-schedule {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fib-ends-at {
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* Fibonacci: exercise lists for 3 / 5 / 8 min work blocks */
+.fib-exercise-setup {
+  margin: 0 0 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.fib-exercise-fields {
+  display: grid;
+  gap: 0.9rem;
+}
+
+@media (min-width: 480px) {
+  .fib-exercise-fields {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.fib-exercise-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.fib-exercise-block__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fib-exercise-add-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.fib-exercise-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(15, 23, 42, 0.55);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fib-exercise-input::placeholder {
+  color: rgba(148, 163, 184, 0.65);
+  font-weight: 500;
+}
+
+.fib-exercise-input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.fib-exercise-add-btn {
+  flex: 0 0 auto;
+  width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  color: #0f172a;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.fib-exercise-add-btn:hover {
+  filter: brightness(1.06);
+  transform: scale(1.04);
+}
+
+.fib-exercise-add-btn:active {
+  transform: scale(0.98);
+}
+
+.fib-exercise-list {
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  max-height: 8.5rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fib-exercise-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin: 0.28rem 0;
+  animation: fib-exercise-item-in 0.22s ease;
+}
+
+@keyframes fib-exercise-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fib-exercise-list-item__text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.fib-exercise-list-item__text::before {
+  content: "– ";
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.fib-exercise-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  margin-left: 0;
+  padding: 0;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.35);
+  vertical-align: middle;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.fib-exercise-remove:hover {
+  background: rgba(185, 28, 28, 0.45);
+  border-color: rgba(248, 113, 113, 0.65);
+}
+
+.fib-current-exercise {
+  margin: 0.35rem 0 0.15rem;
+  text-align: center;
+  font-size: clamp(1.05rem, 3.6vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-wrap: balance;
+  white-space: pre-line;
+}
+
+.progress-wrap {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #22d3ee);
+  transition: width 220ms linear;
+}
+
+.progress-bar--tabata {
+  background: linear-gradient(90deg, var(--tab-accent), var(--tab-work));
+}
+
+.controls {
+  margin-top: 1.4rem;
+  display: flex;
+  gap: 0.7rem;
+}
+
+button {
+  flex: 1;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.72rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #0f172a;
+  background: #e2e8f0;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+button:hover:enabled {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fibonacci card backgrounds (independent from body) */
+.card--fibonacci.fib-bg-work {
+  background: linear-gradient(160deg, rgba(69, 10, 10, 0.92), rgba(127, 29, 29, 0.88));
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.card--fibonacci.fib-bg-rest {
+  background: linear-gradient(160deg, rgba(5, 46, 22, 0.92), rgba(20, 83, 45, 0.88));
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.card--fibonacci.fib-bg-done {
+  background: linear-gradient(160deg, rgba(49, 46, 129, 0.92), rgba(91, 33, 182, 0.88));
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+.card--fibonacci.fib-bg-idle {
+  background: var(--card);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+/* Tabata card backgrounds */
+.card--tabata.tabata-bg-work {
+  background: linear-gradient(155deg, rgba(30, 58, 138, 0.95), rgba(29, 78, 216, 0.88));
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.card--tabata.tabata-bg-rest {
+  background: linear-gradient(155deg, rgba(113, 63, 18, 0.92), rgba(202, 138, 4, 0.85));
+  border-color: rgba(253, 224, 71, 0.45);
+}
+
+.card--tabata.tabata-bg-done {
+  background: linear-gradient(155deg, rgba(12, 74, 110, 0.95), rgba(14, 165, 233, 0.88));
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.card--tabata.tabata-bg-idle {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+/* Export / Import routine controls */
+.fib-io-controls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin: 0.65rem 0 0;
+}
+
+.fib-io-btn {
+  flex: 0 0 auto;
+  padding: 0.38rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: var(--muted);
+  background: rgba(30, 41, 59, 0.6);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.fib-io-btn:hover:enabled {
+  background: rgba(51, 65, 85, 0.85);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: var(--text);
+  transform: none;
+}
+
+.fib-io-feedback {
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--rest);
+  margin: 0.2rem 0 0;
+}
+
+.fib-io-feedback--error {
+  color: var(--work);
+}
+
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .main-area {
+    width: 100%;
+  }
+}

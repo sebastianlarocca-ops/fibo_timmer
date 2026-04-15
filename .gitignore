@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Environment variables — never commit secrets
+.env
+
+# Claude internal
+.claude/
