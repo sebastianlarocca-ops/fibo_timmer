@@ -20,6 +20,13 @@
     >
       Install App
     </button>
+
+    <nav class="app-nav" aria-label="Main navigation">
+      <button type="button" class="nav-btn nav-btn--active" data-view="timer">Timer</button>
+      <button type="button" class="nav-btn" data-view="dashboard">Dashboard</button>
+    </nav>
+
+    <div id="view-timer" class="app-view">
     <div class="app-layout">
       <main class="app main-area">
         <div class="fibonacci-container">
@@ -132,6 +139,41 @@
         </div>
       </main>
     </div>
+    </div><!-- /view-timer -->
+
+    <!-- ── Dashboard view ───────────────────────────────────────── -->
+    <div id="view-dashboard" class="app-view" hidden>
+      <div class="dash-wrapper">
+        <h1 class="dash-title">Dashboard</h1>
+
+        <div class="dash-cards" id="dashCards">
+          <div class="dash-card">
+            <span class="dash-card__label">First Workout</span>
+            <span class="dash-card__value" id="dashFirstDate">—</span>
+          </div>
+          <div class="dash-card dash-card--highlight">
+            <span class="dash-card__label">This Month</span>
+            <span class="dash-card__value" id="dashMonthCount">—</span>
+            <span class="dash-card__sub">workouts</span>
+          </div>
+          <div class="dash-card">
+            <span class="dash-card__label">Last Workout</span>
+            <span class="dash-card__value" id="dashLastDays">—</span>
+          </div>
+          <div class="dash-card">
+            <span class="dash-card__label">Streak</span>
+            <span class="dash-card__value" id="dashStreak">—</span>
+          </div>
+        </div>
+
+        <section class="dash-history">
+          <h2 class="dash-history__title">Workout History</h2>
+          <ul id="dashHistoryList" class="dash-history__list" aria-label="Monthly workout history"></ul>
+        </section>
+
+        <p id="dashMessage" class="dash-message" hidden aria-live="polite"></p>
+      </div>
+    </div><!-- /view-dashboard -->
 
     <div
       id="tabataDrawerOverlay"

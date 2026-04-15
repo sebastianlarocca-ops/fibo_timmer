@@ -970,3 +970,193 @@ initFibIO();
 // Initial paint
 fibonacciResetUi();
 tabataTimer.reset();
+
+// ===========================================================================
+// DASHBOARD
+// ===========================================================================
+
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+// ── Utilities ───────────────────────────────────────────────────────────────
+
+function dashFormatDate(isoStr) {
+  return new Date(isoStr).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+function dashDaysSince(isoStr) {
+  return Math.floor((Date.now() - new Date(isoStr).getTime()) / 86_400_000);
+}
+
+/** Returns { "YYYY-MM": count } for every workout */
+function groupByMonth(workouts) {
+  return workouts.reduce((acc, w) => {
+    const d = new Date(w.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+/** Consecutive training days ending today or yesterday */
+function calcStreak(workouts) {
+  if (!workouts.length) return 0;
+
+  const toDay = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const uniqueDays = [...new Set(workouts.map((w) => toDay(new Date(w.date))))].sort().reverse();
+
+  const today = toDay(new Date());
+  const yesterday = toDay(new Date(Date.now() - 86_400_000));
+
+  if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < uniqueDays.length; i++) {
+    const prev = new Date(uniqueDays[i - 1]);
+    const curr = new Date(uniqueDays[i]);
+    if (Math.round((prev - curr) / 86_400_000) === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+// ── Data fetching ────────────────────────────────────────────────────────────
+
+async function fetchAllWorkouts() {
+  const res = await fetch(`${API_BASE_URL}/api/workouts?limit=500`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = await res.json();
+  return Array.isArray(body) ? body : (body.workouts ?? []);
+}
+
+// ── Stats computation ─────────────────────────────────────────────────────────
+
+function computeDashStats(workouts) {
+  if (!workouts.length) return null;
+
+  const sorted = [...workouts].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const now    = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const byMonth = groupByMonth(workouts);
+
+  return {
+    firstDate:      sorted[0].date,
+    lastDate:       sorted[sorted.length - 1].date,
+    daysSinceLast:  dashDaysSince(sorted[sorted.length - 1].date),
+    thisMonthCount: byMonth[curKey] ?? 0,
+    streak:         calcStreak(workouts),
+    byMonth,
+  };
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+
+function setDashText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function renderDashboard(workouts) {
+  const cards       = document.getElementById("dashCards");
+  const historyList = document.getElementById("dashHistoryList");
+  const msg         = document.getElementById("dashMessage");
+
+  if (!workouts.length) {
+    if (cards) cards.hidden = true;
+    if (historyList) historyList.replaceChildren();
+    if (msg) {
+      msg.textContent = "No workouts yet. Complete a Fibonacci session to start tracking!";
+      msg.className   = "dash-message";
+      msg.hidden      = false;
+    }
+    return;
+  }
+
+  if (cards) cards.hidden = false;
+  if (msg)  msg.hidden    = true;
+
+  const s = computeDashStats(workouts);
+
+  setDashText("dashFirstDate",   dashFormatDate(s.firstDate));
+  setDashText("dashMonthCount",  s.thisMonthCount);
+  setDashText("dashLastDays",    s.daysSinceLast === 0 ? "Today" : `${s.daysSinceLast}d ago`);
+  setDashText("dashStreak",      `${s.streak} day${s.streak !== 1 ? "s" : ""}`);
+
+  if (!historyList) return;
+  historyList.replaceChildren();
+
+  Object.keys(s.byMonth)
+    .sort()
+    .reverse()
+    .forEach((key) => {
+      const [year, month] = key.split("-");
+      const count = s.byMonth[key];
+      const li    = document.createElement("li");
+      li.className = "dash-history__item";
+      li.innerHTML = `
+        <span class="dash-history__period">${year} — ${MONTH_NAMES[parseInt(month, 10) - 1]}</span>
+        <span class="dash-history__count">${count} workout${count !== 1 ? "s" : ""}</span>`;
+      historyList.appendChild(li);
+    });
+}
+
+function setDashLoadingState() {
+  ["dashFirstDate","dashMonthCount","dashLastDays","dashStreak"].forEach((id) =>
+    setDashText(id, "…")
+  );
+  const list = document.getElementById("dashHistoryList");
+  if (list) list.replaceChildren();
+}
+
+// ── Load (fetch → compute → render) ─────────────────────────────────────────
+
+async function loadDashboard() {
+  setDashLoadingState();
+  const msg = document.getElementById("dashMessage");
+  if (msg) msg.hidden = true;
+
+  try {
+    const workouts = await fetchAllWorkouts();
+    renderDashboard(workouts);
+  } catch (err) {
+    console.warn("[Dashboard] fetch failed:", err.message);
+    if (msg) {
+      msg.textContent = "Could not load data — server may be offline.";
+      msg.className   = "dash-message dash-message--error";
+      msg.hidden      = false;
+    }
+  }
+}
+
+// ── View router ───────────────────────────────────────────────────────────────
+
+function showView(name) {
+  document.querySelectorAll(".app-view").forEach((el) => {
+    el.hidden = el.id !== `view-${name}`;
+  });
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.classList.toggle("nav-btn--active", btn.dataset.view === name);
+  });
+  // Tabata FAB is only meaningful inside the timer view
+  const tabataFab = document.getElementById("tabataDrawerOpenBtn");
+  if (tabataFab) tabataFab.hidden = name !== "timer";
+
+  if (name === "dashboard") loadDashboard();
+}
+
+function initNavigation() {
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => showView(btn.dataset.view));
+  });
+}
+
+initNavigation();

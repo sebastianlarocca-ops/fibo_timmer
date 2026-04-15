@@ -655,3 +655,176 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* ===========================================================================
+   Navigation bar
+   =========================================================================== */
+
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1rem;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.nav-btn {
+  flex: 0 0 auto;
+  padding: 0.42rem 1.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.nav-btn:hover:not(.nav-btn--active) {
+  color: var(--text);
+  border-color: rgba(148, 163, 184, 0.45);
+  background: rgba(30, 41, 59, 0.55);
+  transform: none;
+}
+
+.nav-btn--active {
+  color: #0f172a;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+/* ===========================================================================
+   Dashboard view
+   =========================================================================== */
+
+.dash-wrapper {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 4rem;
+}
+
+.dash-title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.3rem, 4vw, 1.7rem);
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* ── KPI cards ── */
+
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+  margin-bottom: 2rem;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem 1.1rem 1.1rem;
+  background: var(--card);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.dash-card--highlight {
+  background: linear-gradient(145deg, rgba(56, 189, 248, 0.14), rgba(14, 165, 233, 0.08));
+  border-color: rgba(56, 189, 248, 0.28);
+}
+
+.dash-card__label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.dash-card__value {
+  font-size: clamp(1.45rem, 5vw, 2rem);
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.dash-card--highlight .dash-card__value {
+  color: var(--accent);
+}
+
+.dash-card__sub {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ── History list ── */
+
+.dash-history__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.dash-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dash-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 10px;
+  animation: fib-exercise-item-in 0.18s ease;
+}
+
+.dash-history__period {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dash-history__count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Empty / error states ── */
+
+.dash-message {
+  text-align: center;
+  padding: 3rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.dash-message--error {
+  color: var(--work);
+}

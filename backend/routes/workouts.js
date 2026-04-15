@@ -50,7 +50,7 @@ router.post("/", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/", async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 1000);
     const workouts = await Workout.find()
       .sort({ date: -1 })
       .limit(limit)
