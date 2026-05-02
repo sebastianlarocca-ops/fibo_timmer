@@ -111,17 +111,17 @@
 
           </div>
 
-          <p id="phaseLabel" class="phase">Ready</p>
-          <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
-          <p id="timeLabel" class="time">00:00</p>
-          <p id="blockLabel" class="block">Block 0 of 5</p>
-          <p id="fibTotalDuration" class="block fib-schedule" aria-label="Total Fibonacci workout duration">
-            Total: —
-          </p>
-          <p id="fibEndsAt" class="block fib-schedule fib-ends-at" hidden aria-live="polite"></p>
+          <div id="fibTimerDisplay" hidden>
+            <p id="phaseLabel" class="phase">Ready</p>
+            <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
+            <p id="timeLabel" class="time">00:00</p>
+            <p id="blockLabel" class="block">Block 0 of 5</p>
+            <p id="fibCountdown" class="fib-countdown" aria-label="Total remaining workout time">—</p>
+            <p id="fibEndsAt" class="block fib-schedule fib-ends-at" hidden aria-live="polite"></p>
 
-          <div class="progress-wrap" aria-label="Fibonacci workout progress">
-            <div id="progressBar" class="progress-bar"></div>
+            <div class="progress-wrap" aria-label="Fibonacci workout progress">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
           </div>
 
           <div class="controls">
@@ -141,10 +141,6 @@
         <h1 class="dash-title">Dashboard</h1>
 
         <div class="dash-cards" id="dashCards">
-          <div class="dash-card">
-            <span class="dash-card__label">First Workout</span>
-            <span class="dash-card__value" id="dashFirstDate">—</span>
-          </div>
           <div class="dash-card dash-card--highlight">
             <span class="dash-card__label">This Month</span>
             <span class="dash-card__value" id="dashMonthCount">—</span>
@@ -153,10 +149,6 @@
           <div class="dash-card">
             <span class="dash-card__label">Last Workout</span>
             <span class="dash-card__value" id="dashLastDays">—</span>
-          </div>
-          <div class="dash-card">
-            <span class="dash-card__label">Streak</span>
-            <span class="dash-card__value" id="dashStreak">—</span>
           </div>
         </div>
 

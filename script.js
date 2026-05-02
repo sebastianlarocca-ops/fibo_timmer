@@ -296,7 +296,9 @@ const fibCard = document.getElementById("fibonacciCard");
 const phaseLabel = document.getElementById("phaseLabel");
 const timeLabel = document.getElementById("timeLabel");
 const blockLabel = document.getElementById("blockLabel");
-const fibTotalDurationLabel = document.getElementById("fibTotalDuration");
+const fibCountdownLabel   = document.getElementById("fibCountdown");
+const fibTimerDisplay     = document.getElementById("fibTimerDisplay");
+const fibExerciseSetup    = document.querySelector(".fib-exercise-setup");
 const fibEndsAtLabel = document.getElementById("fibEndsAt");
 const fibInputCore = document.getElementById("fibInputCore");
 const fibInputBodyweight = document.getElementById("fibInputBodyweight");
@@ -455,9 +457,6 @@ function updateFibCurrentExerciseUi(timer) {
 }
 
 function updateFibonacciScheduleUi(timer) {
-  if (fibTotalDurationLabel) {
-    fibTotalDurationLabel.textContent = `Total: ${formatFibonacciHumanTotal()}`;
-  }
 
   if (!fibEndsAtLabel) return;
 
@@ -492,12 +491,20 @@ function isFibIdleBeforeStart(timer) {
   return timer.remainingMs === first.durationSec * 1000;
 }
 
+function setFibMode(mode) {
+  const setup = mode === "setup";
+  if (fibExerciseSetup) fibExerciseSetup.hidden = !setup;
+  if (fibTimerDisplay)  fibTimerDisplay.hidden  =  setup;
+}
+
 function renderFibonacci(timer) {
   if (timer.isComplete()) {
+    setFibMode("running");
     fibonacciWorkoutEndAtMs = null;
     phaseLabel.textContent = "Workout Complete";
     timeLabel.textContent = "00:00";
     blockLabel.textContent = `Block ${FIB_TOTAL_BLOCKS} of ${FIB_TOTAL_BLOCKS}`;
+    if (fibCountdownLabel) fibCountdownLabel.textContent = "00:00";
     progressBar.style.width = "100%";
     setFibCardBackground("done");
     startBtn.disabled = false;
@@ -508,18 +515,14 @@ function renderFibonacci(timer) {
   }
 
   if (isFibIdleBeforeStart(timer)) {
-    phaseLabel.textContent = "Ready";
-    timeLabel.textContent = formatTime(Math.ceil(timer.remainingMs / 1000));
-    blockLabel.textContent = `Block 0 of ${FIB_TOTAL_BLOCKS}`;
-    progressBar.style.width = "0%";
+    setFibMode("setup");
     setFibCardBackground("idle");
     startBtn.disabled = false;
     pauseBtn.disabled = true;
-    updateFibonacciScheduleUi(timer);
-    updateFibCurrentExerciseUi(timer);
     return;
   }
 
+  setFibMode("running");
   const current = timer.sequence[timer.currentIndex];
   const label = current.type === "work" ? "Work" : "Rest";
   phaseLabel.textContent = label;
@@ -532,6 +535,7 @@ function renderFibonacci(timer) {
   completedSec += Math.max(0, curTotal - curRem);
   const pct = Math.min(100, (completedSec / FIB_TOTAL_SEC) * 100);
   progressBar.style.width = `${pct}%`;
+  if (fibCountdownLabel) fibCountdownLabel.textContent = formatTime(Math.max(0, FIB_TOTAL_SEC - completedSec));
 
   setFibCardBackground(current.type === "work" ? "work" : "rest");
   startBtn.disabled = timer.isRunning();
@@ -905,6 +909,26 @@ function groupByMonth(workouts) {
   }, {});
 }
 
+/** Returns { "YYYY-MM-DD": { date, core[], bodyweight[], overload[] } } */
+function groupByDay(workouts) {
+  const map = {};
+  workouts.forEach((w) => {
+    const d = new Date(w.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (!map[key]) map[key] = { date: d, core: [], bodyweight: [], overload: [] };
+    map[key].core.push(...(w.core || []));
+    map[key].bodyweight.push(...(w.bodyweight || []));
+    map[key].overload.push(...(w.overload || []));
+  });
+  return map;
+}
+
+function dashFormatDayHeader(d) {
+  const day   = d.toLocaleDateString("en-US", { weekday: "short" });
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  return `${day} ${d.getDate()} ${month}`;
+}
+
 /** Consecutive training days ending today or yesterday */
 function calcStreak(workouts) {
   if (!workouts.length) return 0;
@@ -989,31 +1013,43 @@ function renderDashboard(workouts) {
 
   const s = computeDashStats(workouts);
 
-  setDashText("dashFirstDate",   dashFormatDate(s.firstDate));
   setDashText("dashMonthCount",  s.thisMonthCount);
   setDashText("dashLastDays",    s.daysSinceLast === 0 ? "Today" : `${s.daysSinceLast}d ago`);
-  setDashText("dashStreak",      `${s.streak} day${s.streak !== 1 ? "s" : ""}`);
 
   if (!historyList) return;
   historyList.replaceChildren();
 
-  Object.keys(s.byMonth)
+  const byDay = groupByDay(workouts);
+  Object.keys(byDay)
     .sort()
     .reverse()
     .forEach((key) => {
-      const [year, month] = key.split("-");
-      const count = s.byMonth[key];
-      const li    = document.createElement("li");
+      const { date, core, bodyweight, overload } = byDay[key];
+      const rows = Math.max(core.length, bodyweight.length, overload.length, 1);
+
+      let rowsHtml = "";
+      for (let i = 0; i < rows; i++) {
+        rowsHtml += `<tr>
+          <td>${core[i] || ""}</td>
+          <td>${bodyweight[i] || ""}</td>
+          <td>${overload[i] || ""}</td>
+        </tr>`;
+      }
+
+      const li = document.createElement("li");
       li.className = "dash-history__item";
       li.innerHTML = `
-        <span class="dash-history__period">${year} — ${MONTH_NAMES[parseInt(month, 10) - 1]}</span>
-        <span class="dash-history__count">${count} workout${count !== 1 ? "s" : ""}</span>`;
+        <span class="dash-history__date">${dashFormatDayHeader(date)}</span>
+        <table class="dash-day-table">
+          <thead><tr><th>Core</th><th>BD</th><th>OV</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>`;
       historyList.appendChild(li);
     });
 }
 
 function setDashLoadingState() {
-  ["dashFirstDate","dashMonthCount","dashLastDays","dashStreak"].forEach((id) =>
+  ["dashMonthCount","dashLastDays"].forEach((id) =>
     setDashText(id, "…")
   );
   const list = document.getElementById("dashHistoryList");
