@@ -397,6 +397,7 @@ function addExercise(type) {
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
+  updateExerciseCacheWith(text);
 }
 
 /**
@@ -844,6 +845,7 @@ window.addEventListener("appinstalled", () => {
   if (installAppBtn) installAppBtn.hidden = true;
 });
 
+initExerciseAutocomplete(); // must register keydown BEFORE initFibExerciseListsUi
 initFibExerciseListsUi();
 
 // Initial paint
@@ -1099,6 +1101,137 @@ async function loadDashboard() {
       msg.hidden      = false;
     }
   }
+}
+
+// ===========================================================================
+// EXERCISE AUTOCOMPLETE (timer view input fields)
+// ===========================================================================
+
+let _exerciseNameCache = null;
+
+async function getExerciseNames() {
+  if (_exerciseNameCache) return _exerciseNameCache;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/exercises`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    _exerciseNameCache = data.map((e) => e.name); // already lowercase, sorted by lastPerformed
+    return _exerciseNameCache;
+  } catch {
+    return [];
+  }
+}
+
+function updateExerciseCacheWith(text) {
+  const lower = text.trim().toLowerCase();
+  if (!lower || !_exerciseNameCache) return;
+  if (!_exerciseNameCache.includes(lower)) {
+    _exerciseNameCache.unshift(lower); // prepend — newly added ranks first
+  }
+}
+
+function createAutocomplete(input, type) {
+  const dropdown = document.createElement("ul");
+  dropdown.className = "ex-autocomplete";
+  dropdown.hidden = true;
+  input.parentElement.appendChild(dropdown);
+
+  let activeIndex = -1;
+  let lastQuery = "";
+
+  function getItems() {
+    return dropdown.querySelectorAll(".ex-autocomplete__item");
+  }
+
+  function buildItem(name, q) {
+    const li = document.createElement("li");
+    li.className = "ex-autocomplete__item";
+    if (q) {
+      const idx = name.indexOf(q);
+      if (idx !== -1) {
+        li.appendChild(document.createTextNode(name.slice(0, idx)));
+        const mark = document.createElement("mark");
+        mark.className = "ex-match";
+        mark.textContent = name.slice(idx, idx + q.length);
+        li.appendChild(mark);
+        li.appendChild(document.createTextNode(name.slice(idx + q.length)));
+      } else {
+        li.textContent = name;
+      }
+    } else {
+      li.textContent = name;
+    }
+    li.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // keep focus on input
+      input.value = name;
+      closeDropdown();
+      addExercise(type);
+    });
+    return li;
+  }
+
+  function showDropdown(names, q) {
+    dropdown.replaceChildren();
+    activeIndex = -1;
+    if (!names.length) { dropdown.hidden = true; return; }
+    names.forEach((name) => dropdown.appendChild(buildItem(name, q)));
+    dropdown.hidden = false;
+  }
+
+  function closeDropdown() {
+    dropdown.hidden = true;
+    activeIndex = -1;
+  }
+
+  function setActive(index) {
+    const items = getItems();
+    items.forEach((item, i) => item.classList.toggle("ex-autocomplete__item--active", i === index));
+    activeIndex = index;
+  }
+
+  async function refresh() {
+    const q = input.value.trim().toLowerCase();
+    lastQuery = q;
+    if (!q) { closeDropdown(); return; }
+    const names = await getExerciseNames();
+    if (lastQuery !== q) return; // stale — user kept typing
+    const matches = names.filter((n) => n.includes(q)).slice(0, 8);
+    showDropdown(matches, q);
+  }
+
+  input.addEventListener("input", refresh);
+
+  input.addEventListener("keydown", (e) => {
+    const items = getItems();
+    if (dropdown.hidden) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive(Math.min(activeIndex + 1, items.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive(Math.max(activeIndex - 1, 0));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // prevent the existing Enter→addExercise handler
+      input.value = items[activeIndex].textContent;
+      closeDropdown();
+      addExercise(type);
+    } else if (e.key === "Escape") {
+      closeDropdown();
+    }
+  });
+
+  input.addEventListener("blur", () => setTimeout(closeDropdown, 150));
+
+  input.addEventListener("focus", refresh);
+}
+
+function initExerciseAutocomplete() {
+  FIB_BLOCK_TYPES.forEach((type) => {
+    const input = fibInputByType[type];
+    if (input) createAutocomplete(input, type);
+  });
 }
 
 // ===========================================================================
