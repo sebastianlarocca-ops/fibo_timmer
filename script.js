@@ -495,6 +495,12 @@ function setFibMode(mode) {
   const setup = mode === "setup";
   if (fibExerciseSetup) fibExerciseSetup.hidden = !setup;
   if (fibTimerDisplay)  fibTimerDisplay.hidden  =  setup;
+
+  // Show Tabata panel only when the Fibonacci timer is active
+  const tabataPanel = document.getElementById("tabataPanel");
+  const viewTimer   = document.getElementById("view-timer");
+  if (tabataPanel) tabataPanel.hidden = setup;
+  if (viewTimer)   viewTimer.classList.toggle("timer-running", !setup);
 }
 
 function renderFibonacci(timer) {
@@ -787,43 +793,6 @@ tabWork.addEventListener("change", onTabataConfigChange);
 tabRest.addEventListener("change", onTabataConfigChange);
 tabRounds.addEventListener("change", onTabataConfigChange);
 
-// --- Tabata: slide-in drawer (fixed; no impact on Fibonacci layout) ---
-function initTabataDrawer() {
-  const overlay = document.getElementById("tabataDrawerOverlay");
-  const drawer = document.getElementById("tabataDrawer");
-  const openBtn = document.getElementById("tabataDrawerOpenBtn");
-  const closeBtn = document.getElementById("tabataDrawerClose");
-
-  if (!overlay || !drawer || !openBtn || !closeBtn) return;
-
-  function openTabataDrawer() {
-    overlay.classList.add("active");
-    drawer.classList.add("open");
-    overlay.setAttribute("aria-hidden", "false");
-    drawer.setAttribute("aria-hidden", "false");
-    openBtn.setAttribute("aria-expanded", "true");
-  }
-
-  function closeTabataDrawer() {
-    overlay.classList.remove("active");
-    drawer.classList.remove("open");
-    overlay.setAttribute("aria-hidden", "true");
-    drawer.setAttribute("aria-hidden", "true");
-    openBtn.setAttribute("aria-expanded", "false");
-  }
-
-  openBtn.addEventListener("click", openTabataDrawer);
-  closeBtn.addEventListener("click", closeTabataDrawer);
-  overlay.addEventListener("click", closeTabataDrawer);
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && drawer.classList.contains("open")) {
-      closeTabataDrawer();
-    }
-  });
-}
-
-initTabataDrawer();
 
 // --- PWA: service worker + optional install prompt ---
 // Service workers require a secure context (HTTPS or localhost) in production.
@@ -1085,10 +1054,6 @@ function showView(name) {
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.toggle("nav-btn--active", btn.dataset.view === name);
   });
-  // Tabata FAB is only meaningful inside the timer view
-  const tabataFab = document.getElementById("tabataDrawerOpenBtn");
-  if (tabataFab) tabataFab.hidden = name !== "timer";
-
   if (name === "dashboard") loadDashboard();
 }
 

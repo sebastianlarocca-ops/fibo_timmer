@@ -54,161 +54,95 @@ body.app-body {
   box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
 }
 
-.app-layout {
-  min-height: 100vh;
+/* ── Timer view: side-by-side layout ──────────────────────────────────────── */
+
+.timer-view-layout {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: flex-start;
   justify-content: center;
   gap: 1.25rem;
   padding: 1rem;
 }
 
-.main-area {
-  position: relative;
-  flex: 1 1 420px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 0.5rem;
-}
-
-.fibonacci-container {
-  width: 100%;
+/* Fibonacci column */
+.fib-section {
+  flex: 1 1 340px;
+  max-width: 520px;
   display: flex;
   justify-content: center;
 }
 
-/* --- Tabata: overlay + drawer (fixed siblings; never alter body layout/background) --- */
-
-.tabata-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
+.fib-section .card--fibonacci {
   width: 100%;
-  height: 100%;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
 }
 
-.tabata-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
+/* Tabata column — hidden in setup, shown when timer runs */
+.tabata-panel {
+  flex: 1 1 260px;
+  max-width: 360px;
 }
 
-.tabata-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 300px;
+.tabata-panel .card--tabata {
+  width: 100%;
   max-width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-  background: rgba(15, 23, 42, 0.98);
-  border-left: 1px solid rgba(37, 99, 235, 0.35);
-  box-shadow: -8px 0 28px rgba(2, 6, 23, 0.25);
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
-.tabata-drawer.open {
-  transform: translateX(0);
+/* ── Compact mode: tighter spacing so both panels fit without scroll ───────── */
+
+/* Applied when timer is active (both panels visible) */
+#view-timer.timer-running .card--fibonacci {
+  padding: 1.5rem 1.75rem;
 }
 
-.tabata-drawer__header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 1rem 1rem 0.75rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+#view-timer.timer-running .block {
+  margin: 0.3rem 0 0.75rem;
 }
 
-.tabata-drawer__title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+#view-timer.timer-running .fib-countdown {
+  margin-bottom: 0.6rem;
 }
 
-.tabata-drawer__close {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 10px;
-  font-size: 1.5rem;
-  line-height: 1;
-  font-weight: 700;
-  cursor: pointer;
-  color: var(--text);
-  background: rgba(30, 41, 59, 0.9);
-  transition: border-color 150ms ease, background 150ms ease;
+#view-timer.timer-running .controls {
+  margin-top: 1rem;
 }
 
-/* Drawer header is not a flex row of equal buttons — override global `button { flex: 1 }`. */
-.tabata-drawer__header .tabata-drawer__close {
-  flex: 0 0 auto;
-}
+/* Mobile: stack columns and tighten further */
+@media (max-width: 680px) {
+  .timer-view-layout {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
 
-.tabata-drawer__close:hover {
-  border-color: rgba(96, 165, 250, 0.55);
-  background: rgba(30, 58, 138, 0.45);
-}
+  .fib-section,
+  .tabata-panel {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
 
-.tabata-drawer__body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0.75rem 1rem 1.25rem;
-  touch-action: pan-y;
-}
+  #view-timer.timer-running .card--fibonacci {
+    padding: 1rem 1.25rem;
+  }
 
-.tabata-drawer-open {
-  position: fixed;
-  right: 1rem;
-  bottom: 1.25rem;
-  z-index: 1002;
-  border: 1px solid rgba(37, 99, 235, 0.5);
-  border-radius: 999px;
-  padding: 0.65rem 1.1rem;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  color: #e2e8f0;
-  background: linear-gradient(160deg, rgba(30, 58, 138, 0.95), rgba(29, 78, 216, 0.88));
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+  #view-timer.timer-running h1 {
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+  }
 
-.tabata-drawer-open:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.55);
-}
+  #view-timer.timer-running .time {
+    font-size: clamp(2rem, 9vw, 3rem);
+  }
 
-.tabata-drawer-open:active {
-  transform: translateY(0);
-}
+  #view-timer.timer-running .block {
+    margin: 0.2rem 0 0.5rem;
+  }
 
-@media (max-width: 480px) {
-  .tabata-drawer {
-    width: 100%;
+  #view-timer.timer-running .fib-countdown {
+    margin-bottom: 0.4rem;
+  }
+
+  #view-timer.timer-running .controls {
+    margin-top: 0.65rem;
   }
 }
 
@@ -614,17 +548,6 @@ button:disabled {
   border-color: rgba(37, 99, 235, 0.35);
 }
 
-
-@media (max-width: 768px) {
-  .app-layout {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .main-area {
-    width: 100%;
-  }
-}
 
 /* ===========================================================================
    Navigation bar
