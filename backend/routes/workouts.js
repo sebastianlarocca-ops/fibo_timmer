@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Workout = require("../models/workout");
+const Exercise = require("../models/exercise");
 
 // ---------------------------------------------------------------------------
 // POST /api/workouts
@@ -32,6 +33,20 @@ router.post("/", async (req, res) => {
     const saved = await workout.save();
 
     console.log(`[workout saved] id=${saved._id}  date=${saved.date.toISOString()}`);
+
+    // Upsert new exercises into the exercise database (lowercase, deduplicated)
+    const allExercises = [...core, ...bodyweight, ...overload]
+      .map((e) => String(e).trim().toLowerCase())
+      .filter(Boolean);
+    const unique = [...new Set(allExercises)];
+    if (unique.length) {
+      await Promise.all(
+        unique.map((name) =>
+          Exercise.updateOne({ name }, { $set: { name } }, { upsert: true })
+        )
+      );
+      console.log(`[exercises upserted] ${unique.join(", ")}`);
+    }
 
     return res.status(201).json({
       message: "Workout saved successfully.",

@@ -28,6 +28,7 @@
       <div class="nav-tabs">
         <button type="button" class="nav-btn nav-btn--active" data-view="timer">Timer</button>
         <button type="button" class="nav-btn" data-view="dashboard">Dashboard</button>
+        <button type="button" class="nav-btn" data-view="exercises">Exercises</button>
       </div>
     </nav>
 
@@ -217,6 +218,30 @@
         <p id="dashMessage" class="dash-message" hidden aria-live="polite"></p>
       </div>
     </div><!-- /view-dashboard -->
+
+    <!-- ── Exercises view ─────────────────────────────────────────── -->
+    <div id="view-exercises" class="app-view" hidden>
+      <div class="ex-wrapper">
+        <div class="ex-header">
+          <h1 class="ex-title">Exercises</h1>
+          <span class="ex-count" id="exCount"></span>
+        </div>
+
+        <div class="ex-search-wrap">
+          <input
+            id="exSearch"
+            type="search"
+            class="ex-search"
+            placeholder="Filter exercises…"
+            autocomplete="off"
+            aria-label="Filter exercises"
+          />
+        </div>
+
+        <div id="exList" class="ex-list" aria-live="polite"></div>
+        <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
+      </div>
+    </div><!-- /view-exercises -->
 
     <script src="script.js"></script>
   </body>

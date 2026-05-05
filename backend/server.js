@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 
 const workoutsRouter = require("./routes/workouts");
+const exercisesRouter = require("./routes/exercises");
 
 // ---------------------------------------------------------------------------
 // App setup
@@ -23,6 +24,7 @@ app.use(express.json({ limit: "1mb" }));
 // Routes
 // ---------------------------------------------------------------------------
 app.use("/api/workouts", workoutsRouter);
+app.use("/api/exercises", exercisesRouter);
 
 // Health-check — useful for Render's zero-downtime checks
 app.get("/health", (_req, res) => {

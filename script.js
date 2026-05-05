@@ -1101,6 +1101,85 @@ async function loadDashboard() {
   }
 }
 
+// ===========================================================================
+// EXERCISES VIEW
+// ===========================================================================
+
+let _allExercises = [];
+
+function renderExercises(exercises) {
+  const list    = document.getElementById("exList");
+  const msg     = document.getElementById("exMessage");
+  const counter = document.getElementById("exCount");
+
+  if (!list) return;
+  list.replaceChildren();
+
+  if (!exercises.length && _allExercises.length) {
+    if (msg) { msg.textContent = "No exercises match your search."; msg.hidden = false; }
+    if (counter) counter.textContent = "";
+    return;
+  }
+
+  if (msg) msg.hidden = true;
+  if (counter) counter.textContent = `${_allExercises.length} total`;
+
+  exercises.forEach((name) => {
+    const chip = document.createElement("span");
+    chip.className = "ex-chip";
+    chip.textContent = name;
+    list.appendChild(chip);
+  });
+}
+
+function setExercisesLoadingState() {
+  const list = document.getElementById("exList");
+  const counter = document.getElementById("exCount");
+  if (counter) counter.textContent = "";
+  if (!list) return;
+  list.replaceChildren();
+  [70, 90, 120, 80, 110, 95].forEach((w) => {
+    const el = document.createElement("span");
+    el.className = "ex-skeleton";
+    el.style.width = `${w}px`;
+    list.appendChild(el);
+  });
+}
+
+async function loadExercises() {
+  const msg    = document.getElementById("exMessage");
+  const search = document.getElementById("exSearch");
+  if (msg) msg.hidden = true;
+  if (search) search.value = "";
+
+  setExercisesLoadingState();
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/exercises`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _allExercises = await res.json();
+    renderExercises(_allExercises);
+  } catch (err) {
+    console.warn("[Exercises] fetch failed:", err.message);
+    const list = document.getElementById("exList");
+    if (list) list.replaceChildren();
+    if (msg) {
+      msg.textContent = "Could not load exercises — server may be offline.";
+      msg.className   = "dash-message dash-message--error";
+      msg.hidden      = false;
+    }
+  }
+}
+
+function initExercisesSearch() {
+  const input = document.getElementById("exSearch");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    renderExercises(q ? _allExercises.filter((n) => n.includes(q)) : _allExercises);
+  });
+}
+
 // ── View router ───────────────────────────────────────────────────────────────
 
 function showView(name) {
@@ -1111,6 +1190,7 @@ function showView(name) {
     btn.classList.toggle("nav-btn--active", btn.dataset.view === name);
   });
   if (name === "dashboard") loadDashboard();
+  if (name === "exercises")  loadExercises();
 }
 
 function initNavigation() {
@@ -1120,3 +1200,4 @@ function initNavigation() {
 }
 
 initNavigation();
+initExercisesSearch();
