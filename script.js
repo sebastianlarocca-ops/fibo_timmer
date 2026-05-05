@@ -1106,10 +1106,36 @@ async function loadDashboard() {
 // ===========================================================================
 
 let _allExercises = [];
+let _exSortKey = "lastPerformed";
+let _exSortDir = "desc";
 
 function exFormatDate(isoStr) {
   if (!isoStr) return "—";
   return new Date(isoStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function sortExercises(list) {
+  return [...list].sort((a, b) => {
+    if (_exSortKey === "name") {
+      return _exSortDir === "asc"
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name);
+    }
+    let va, vb;
+    if (_exSortKey === "lastPerformed") {
+      va = a.lastPerformed ? new Date(a.lastPerformed).getTime() : 0;
+      vb = b.lastPerformed ? new Date(b.lastPerformed).getTime() : 0;
+    } else {
+      va = a.daysPerformed ?? 0;
+      vb = b.daysPerformed ?? 0;
+    }
+    return _exSortDir === "asc" ? va - vb : vb - va;
+  });
+}
+
+function exArrow(key) {
+  if (_exSortKey !== key) return '<span class="ex-arrow">↕</span>';
+  return `<span class="ex-arrow">${_exSortDir === "asc" ? "↑" : "↓"}</span>`;
 }
 
 function renderExercises(exercises) {
@@ -1129,30 +1155,81 @@ function renderExercises(exercises) {
   if (msg) msg.hidden = true;
   if (counter) counter.textContent = `${_allExercises.length} total`;
 
-  exercises.forEach(({ name, lastPerformed, daysPerformed }) => {
-    const card = document.createElement("div");
-    card.className = "ex-card";
-    card.innerHTML = `
-      <span class="ex-card__name">${name}</span>
-      <div class="ex-card__meta">
-        <span class="ex-card__last" title="Last performed">${exFormatDate(lastPerformed)}</span>
-        <span class="ex-card__days">${daysPerformed ?? 0} day${daysPerformed !== 1 ? "s" : ""}</span>
-      </div>`;
-    list.appendChild(card);
+  const sorted = sortExercises(exercises);
+
+  const wrap = document.createElement("div");
+  wrap.className = "ex-table-wrap";
+
+  const table = document.createElement("table");
+  table.className = "ex-table";
+
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  const cols = [
+    { key: "name",          label: "Exercise" },
+    { key: "lastPerformed", label: "Last"     },
+    { key: "daysPerformed", label: "Days"     },
+  ];
+
+  cols.forEach(({ key, label }) => {
+    const th = document.createElement("th");
+    th.className = "ex-th" + (_exSortKey === key ? " ex-th--active" : "");
+    th.innerHTML = `${label}${exArrow(key)}`;
+    th.addEventListener("click", () => {
+      if (_exSortKey === key) {
+        _exSortDir = _exSortDir === "asc" ? "desc" : "asc";
+      } else {
+        _exSortKey = key;
+        _exSortDir = key === "name" ? "asc" : "desc";
+      }
+      const q = document.getElementById("exSearch")?.value.trim().toLowerCase() || "";
+      renderExercises(q ? _allExercises.filter((e) => e.name.includes(q)) : _allExercises);
+    });
+    headerRow.appendChild(th);
   });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  sorted.forEach(({ name, lastPerformed, daysPerformed }) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="ex-td ex-td--name">${name}</td>
+      <td class="ex-td ex-td--date">${exFormatDate(lastPerformed)}</td>
+      <td class="ex-td ex-td--days">${daysPerformed ?? 0}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  list.appendChild(wrap);
 }
 
 function setExercisesLoadingState() {
-  const list = document.getElementById("exList");
+  const list    = document.getElementById("exList");
   const counter = document.getElementById("exCount");
   if (counter) counter.textContent = "";
   if (!list) return;
   list.replaceChildren();
-  for (let i = 0; i < 6; i++) {
-    const el = document.createElement("div");
-    el.className = "ex-card ex-card--skeleton";
-    list.appendChild(el);
-  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "ex-table-wrap";
+  const table = document.createElement("table");
+  table.className = "ex-table";
+  const tbody = document.createElement("tbody");
+  [100, 140, 80, 120, 95, 110].forEach((w) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="ex-td"><span class="ex-sk-cell" style="width:${w}px"></span></td>
+      <td class="ex-td"><span class="ex-sk-cell" style="width:44px"></span></td>
+      <td class="ex-td ex-td--days"><span class="ex-sk-cell" style="width:22px"></span></td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  list.appendChild(wrap);
 }
 
 async function loadExercises() {
