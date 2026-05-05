@@ -931,10 +931,33 @@ function calcStreak(workouts) {
 // ── Data fetching ────────────────────────────────────────────────────────────
 
 async function fetchAllWorkouts() {
-  const res = await fetch(`${API_BASE_URL}/api/workouts?limit=500`);
+  const res = await fetch(`${API_BASE_URL}/api/workouts?limit=100`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.json();
   return Array.isArray(body) ? body : (body.workouts ?? []);
+}
+
+// ── Dashboard cache (localStorage) ──────────────────────────────────────────
+
+const DASH_CACHE_KEY = "dashCache_v1";
+const DASH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function readDashCache() {
+  try {
+    const raw = localStorage.getItem(DASH_CACHE_KEY);
+    if (!raw) return null;
+    const { workouts, ts } = JSON.parse(raw);
+    if (!Array.isArray(workouts)) return null;
+    return { workouts, stale: Date.now() - ts > DASH_CACHE_TTL };
+  } catch {
+    return null;
+  }
+}
+
+function writeDashCache(workouts) {
+  try {
+    localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({ workouts, ts: Date.now() }));
+  } catch { /* storage full / private mode */ }
 }
 
 // ── Stats computation ─────────────────────────────────────────────────────────
@@ -965,9 +988,13 @@ function setDashText(id, text) {
 }
 
 function renderDashboard(workouts) {
+  const wrapper     = document.querySelector(".dash-wrapper");
   const cards       = document.getElementById("dashCards");
   const historyList = document.getElementById("dashHistoryList");
   const msg         = document.getElementById("dashMessage");
+
+  // Remove loading state
+  if (wrapper) wrapper.classList.remove("dash-loading");
 
   if (!workouts.length) {
     if (cards) cards.hidden = true;
@@ -1021,25 +1048,51 @@ function renderDashboard(workouts) {
 }
 
 function setDashLoadingState() {
-  ["dashMonthCount","dashLastDays"].forEach((id) =>
-    setDashText(id, "…")
-  );
+  const wrapper = document.querySelector(".dash-wrapper");
+  if (wrapper) wrapper.classList.add("dash-loading");
+
+  ["dashMonthCount", "dashLastDays"].forEach((id) => setDashText(id, "—"));
+
+  // Skeleton placeholder cards in the history list
   const list = document.getElementById("dashHistoryList");
-  if (list) list.replaceChildren();
+  if (list) {
+    list.replaceChildren();
+    for (let i = 0; i < 3; i++) {
+      const li = document.createElement("li");
+      li.className = "dash-skeleton-item";
+      list.appendChild(li);
+    }
+  }
 }
 
-// ── Load (fetch → compute → render) ─────────────────────────────────────────
+// ── Load: cache-first, then refresh in background ────────────────────────────
 
 async function loadDashboard() {
-  setDashLoadingState();
   const msg = document.getElementById("dashMessage");
   if (msg) msg.hidden = true;
 
+  const cached = readDashCache();
+
+  if (cached) {
+    // Show cached data instantly — no loading state shown to the user
+    renderDashboard(cached.workouts);
+    if (!cached.stale) return; // cache is fresh — skip network trip
+    // Stale cache: data is already visible, refresh silently in background
+  } else {
+    // First ever load — show skeleton animation while we wait
+    setDashLoadingState();
+  }
+
   try {
     const workouts = await fetchAllWorkouts();
+    writeDashCache(workouts);
     renderDashboard(workouts);
   } catch (err) {
     console.warn("[Dashboard] fetch failed:", err.message);
+    if (cached) return; // cached data is still showing — no need to show an error
+    // No cache and network failed — show error
+    const wrapper = document.querySelector(".dash-wrapper");
+    if (wrapper) wrapper.classList.remove("dash-loading");
     if (msg) {
       msg.textContent = "Could not load data — server may be offline.";
       msg.className   = "dash-message dash-message--error";

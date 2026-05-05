@@ -816,6 +816,33 @@ button:disabled {
   }
 }
 
+/* ── Dashboard loading animation ─────────────────────────────── */
+
+@keyframes dash-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.28; }
+}
+
+/* Pulsing stat values */
+.dash-loading .dash-card__value,
+.dash-loading .dash-card__label,
+.dash-loading .dash-card__sub {
+  animation: dash-pulse 1.5s ease-in-out infinite;
+}
+.dash-loading .dash-card__label { animation-delay: 0.08s; }
+.dash-loading .dash-card__sub   { animation-delay: 0.16s; }
+
+/* Skeleton history placeholders */
+.dash-skeleton-item {
+  height: 76px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--raised-sm);
+  animation: dash-pulse 1.5s ease-in-out infinite;
+}
+.dash-skeleton-item:nth-child(2) { animation-delay: 0.2s;  height: 96px; }
+.dash-skeleton-item:nth-child(3) { animation-delay: 0.4s;  height: 76px; }
+
 /* ── Dashboard ────────────────────────────────────────────────── */
 .dash-wrapper {
   max-width: 560px;
