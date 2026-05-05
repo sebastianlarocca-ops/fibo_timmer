@@ -481,6 +481,9 @@ function fibWorkBlockNumber(index) {
 function setFibCardBackground(kind) {
   fibCard.classList.remove("fib-bg-idle", "fib-bg-work", "fib-bg-rest", "fib-bg-done");
   fibCard.classList.add(`fib-bg-${kind}`);
+  // Full-page mood tint via body class
+  document.body.classList.remove("page-idle", "page-work", "page-rest", "page-done");
+  document.body.classList.add(`page-${kind}`);
 }
 
 function isFibIdleBeforeStart(timer) {

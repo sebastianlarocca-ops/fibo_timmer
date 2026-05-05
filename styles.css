@@ -1,71 +1,174 @@
+/* ================================================================
+   Fibonacci & Tabata Timer — Neumorphic Design System
+   ================================================================ */
+
 :root {
-  --bg: #0f172a;
-  --card: rgba(15, 23, 42, 0.72);
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --work: #ef4444;
-  --rest: #22c55e;
-  --done: #8b5cf6;
-  --accent: #38bdf8;
+  /* Surfaces */
+  --bg:        #1a1a1d;
+  --bg-deep:   #141416;
+  --surface:   #1f1f23;
+  --surface-2: #25252a;
+  --surface-3: #2b2b30;
 
-  /* Tabata palette (blue / yellow) */
-  --tab-work: #2563eb;
-  --tab-rest: #eab308;
-  --tab-done: #0ea5e9;
-  --tab-accent: #fde047;
+  /* Accents — warm orange (Work/primary) */
+  --accent-warm:    #d97548;
+  --accent-warm-hi: #e8855a;
+  --accent-warm-lo: #b85e36;
+
+  /* Accents — cool green (Rest/success) */
+  --accent-cool:    #5a8064;
+  --accent-cool-hi: #6f9779;
+  --accent-cool-lo: #466150;
+
+  /* Completed state */
+  --accent-done:    #7b7fba;
+
+  /* Text */
+  --fg:      #e8e6e3;
+  --fg-mute: #a09e9b;
+  --fg-dim:  #6b6967;
+
+  /* Neumorphic shadow components */
+  --sh-light:    rgba(255, 255, 255, 0.04);
+  --sh-light-hi: rgba(255, 255, 255, 0.065);
+  --sh-dark:     rgba(0, 0, 0, 0.55);
+  --sh-dark-hi:  rgba(0, 0, 0, 0.72);
+
+  /* Shadow presets */
+  --raised:
+    -6px -6px 14px var(--sh-light),
+     8px  8px 18px var(--sh-dark);
+  --raised-sm:
+    -3px -3px  8px var(--sh-light),
+     4px  4px 10px var(--sh-dark);
+  --inset:
+    inset -3px -3px  8px var(--sh-light),
+    inset  4px  4px 10px var(--sh-dark);
+  --inset-deep:
+    inset -2px -2px  6px var(--sh-light-hi),
+    inset  6px  6px 16px var(--sh-dark-hi);
+  --pressed:
+    inset -2px -2px  5px var(--sh-light),
+    inset  3px  3px  8px var(--sh-dark);
+
+  /* Dial dimensions (overridable per breakpoint/mode) */
+  --dial-size:      260px;
+  --dial-inner:     210px;
+  --dial-sm:        190px;
+  --dial-inner-sm:  150px;
+
+  /* Radii */
+  --r-sm:  8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+
+  /* Type */
+  --font-ui:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-num: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body.app-body {
   margin: 0;
   min-height: 100vh;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: var(--text);
-  background: radial-gradient(circle at top, #1e293b, var(--bg));
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  transition: background 500ms ease;
 }
 
-/**
- * PWA install affordance (shown when browser fires beforeinstallprompt).
- */
+/* Full-page mood tints (set on body by JS) */
+body.page-work { background: linear-gradient(180deg, #271c16 0%, #1a120d 100%); }
+body.page-rest { background: linear-gradient(180deg, #152019 0%, #0f1612 100%); }
+body.page-done { background: linear-gradient(180deg, #1d1d2d 0%, #141422 100%); }
+
+/* ── PWA install button ────────────────────────────────────────── */
 .btn-install-app {
   position: fixed;
   top: 0.75rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  border: 1px solid rgba(56, 189, 248, 0.45);
+  border: 1px solid rgba(217, 117, 72, 0.4);
   border-radius: 999px;
   padding: 0.45rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
-  color: #0f172a;
-  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
-  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.35);
+  color: var(--bg);
+  background: linear-gradient(180deg, var(--accent-warm-hi), var(--accent-warm));
+  box-shadow: var(--raised-sm);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-
 .btn-install-app:hover {
   transform: translateX(-50%) translateY(-1px);
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
+  box-shadow: var(--raised);
 }
 
-/* ── Timer view: side-by-side layout ──────────────────────────────────────── */
+/* ── Navigation ───────────────────────────────────────────────── */
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.7rem 1rem;
+  background: rgba(20, 20, 22, 0.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
 
+.nav-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  box-shadow: var(--inset);
+}
+
+.nav-btn {
+  flex: 0 0 auto;
+  padding: 9px 28px;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.nav-btn:hover:not(.nav-btn--active) {
+  color: var(--fg);
+  transform: none;
+}
+.nav-btn--active {
+  color: var(--fg);
+  background: var(--surface-2);
+  box-shadow: var(--raised-sm);
+}
+
+/* ── Timer view layout ────────────────────────────────────────── */
 .timer-view-layout {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: center;
-  gap: 1.25rem;
-  padding: 1rem;
+  gap: 1.5rem;
+  padding: 1.25rem;
 }
 
-/* Fibonacci column */
 .fib-section {
   flex: 1 1 340px;
   max-width: 520px;
@@ -77,10 +180,9 @@ body.app-body {
   width: 100%;
 }
 
-/* Tabata column — hidden in setup, shown when timer runs */
 .tabata-panel {
   flex: 1 1 260px;
-  max-width: 360px;
+  max-width: 340px;
 }
 
 .tabata-panel .card--tabata {
@@ -88,26 +190,583 @@ body.app-body {
   max-width: 100%;
 }
 
-/* ── Compact mode: tighter spacing so both panels fit without scroll ───────── */
+/* ── App views ────────────────────────────────────────────────── */
+.app-view { /* wrapper */ }
 
-/* Applied when timer is active (both panels visible) */
+/* ── Cards ────────────────────────────────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  padding: 1.75rem;
+  box-shadow: var(--raised);
+}
+
+.card--fibonacci {
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.card--tabata {
+  max-width: 100%;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* ── Headings ─────────────────────────────────────────────────── */
+h1 {
+  margin: 0 0 0.2rem;
+  text-align: center;
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+}
+
+.card-subtitle {
+  margin: 0 0 1.25rem;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.tabata-heading {
+  margin: 0 0 0.2rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+}
+
+/* ── Exercise setup (form) ────────────────────────────────────── */
+.fib-exercise-setup {
+  margin: 1rem 0 1.25rem;
+}
+
+.fib-exercise-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fib-exercise-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fib-exercise-block__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.fib-exercise-block__label span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--fg);
+}
+
+.fib-block-time {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--fg-mute);
+}
+
+.fib-exercise-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.fib-exercise-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-deep);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--fg);
+  box-shadow: var(--inset);
+  outline: none;
+  transition: box-shadow 150ms;
+}
+.fib-exercise-input::placeholder { color: var(--fg-dim); }
+.fib-exercise-input:focus {
+  box-shadow: var(--inset), 0 0 0 2px rgba(217, 117, 72, 0.28);
+}
+
+.fib-exercise-add-btn {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--accent-warm-hi);
+  font-size: 1.4rem;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--raised-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 130ms, transform 130ms;
+}
+.fib-exercise-add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--raised);
+}
+.fib-exercise-add-btn:active {
+  transform: none;
+  box-shadow: var(--pressed);
+}
+
+.fib-exercise-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 110px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fib-exercise-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  box-shadow: var(--raised-sm);
+  animation: item-in 0.2s ease;
+}
+
+@keyframes item-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.fib-exercise-list-item__text {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.02em;
+}
+
+.fib-exercise-remove {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 120ms, background 120ms;
+}
+.fib-exercise-remove:hover {
+  color: #e88;
+  background: rgba(200, 60, 60, 0.15);
+}
+
+/* ── Timer header row ─────────────────────────────────────────── */
+.timer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+/* ── Status pill ──────────────────────────────────────────────── */
+.phase {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  box-shadow: var(--inset);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  transition: color 400ms ease;
+}
+
+.phase::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  flex-shrink: 0;
+  transition: background 400ms ease, box-shadow 400ms ease;
+}
+
+/* Work mood */
+.fib-bg-work .phase,
+.tabata-bg-work .phase--tabata {
+  color: var(--accent-warm-hi);
+}
+.fib-bg-work .phase::before,
+.tabata-bg-work .phase--tabata::before {
+  background: var(--accent-warm);
+  box-shadow: 0 0 8px var(--accent-warm);
+}
+
+/* Rest mood */
+.fib-bg-rest .phase,
+.tabata-bg-rest .phase--tabata {
+  color: var(--accent-cool-hi);
+}
+.fib-bg-rest .phase::before,
+.tabata-bg-rest .phase--tabata::before {
+  background: var(--accent-cool);
+  box-shadow: 0 0 8px var(--accent-cool);
+}
+
+/* Done mood */
+.fib-bg-done .phase {
+  color: var(--accent-done);
+}
+.fib-bg-done .phase::before {
+  background: var(--accent-done);
+  box-shadow: 0 0 8px var(--accent-done);
+}
+
+/* Block label (Block X of 5) */
+.block {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+/* ── Dial ─────────────────────────────────────────────────────── */
+.dial-wrap {
+  position: relative;
+  width: var(--dial-size);
+  height: var(--dial-size);
+  margin: 0 auto 1.25rem;
+  border-radius: 50%;
+  background: var(--bg-deep);
+  box-shadow: var(--inset-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dial-inner {
+  width: var(--dial-inner);
+  height: var(--dial-inner);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #2b2b30, #1c1c20);
+  box-shadow: var(--raised);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: background 500ms ease;
+}
+
+/* Fibonacci dial mood tints */
+.fib-bg-work  .dial-inner { background: linear-gradient(145deg, #3d261e, #261713); }
+.fib-bg-rest  .dial-inner { background: linear-gradient(145deg, #2a3529, #1a221c); }
+.fib-bg-done  .dial-inner { background: linear-gradient(145deg, #272637, #1a1a28); }
+
+/* Tabata dial mood tints */
+.tabata-bg-work .dial-inner { background: linear-gradient(145deg, #3d261e, #261713); }
+.tabata-bg-rest .dial-inner { background: linear-gradient(145deg, #2a3529, #1a221c); }
+.tabata-bg-done .dial-inner { background: linear-gradient(145deg, #1e2a3a, #131826); }
+
+/* Small dial for the Tabata inline panel */
+.dial-wrap--sm {
+  width: var(--dial-sm);
+  height: var(--dial-sm);
+  margin-bottom: 1rem;
+}
+.dial-wrap--sm .dial-inner {
+  width: var(--dial-inner-sm);
+  height: var(--dial-inner-sm);
+}
+
+/* ── Timer digits ─────────────────────────────────────────────── */
+.time {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: clamp(2.6rem, 9vw, 3.4rem);
+  font-weight: 500;
+  color: var(--fg);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.time--tabata {
+  font-size: clamp(2rem, 7vw, 2.6rem);
+}
+
+/* ── Exercise name inside dial ────────────────────────────────── */
+.fib-current-exercise {
+  margin: 0;
+  font-size: clamp(0.65rem, 1.8vw, 0.82rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.3;
+  transition: color 400ms ease;
+}
+.fib-bg-work .fib-current-exercise { color: var(--accent-warm-hi); }
+.fib-bg-rest .fib-current-exercise { color: var(--accent-cool-hi); }
+
+/* ── Countdown + ends-at (below time in dial) ─────────────────── */
+.fib-countdown {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--fg-mute);
+}
+
+.fib-ends-at {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+
+/* ── Progress track ───────────────────────────────────────────── */
+.progress-wrap {
+  width: 100%;
+  height: 10px;
+  background: var(--bg-deep);
+  border-radius: 999px;
+  box-shadow: var(--inset);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-warm-lo), var(--accent-warm));
+  box-shadow: 0 0 10px rgba(217, 117, 72, 0.5);
+  transition: width 220ms linear;
+}
+
+/* Rest phase — cool fill */
+.fib-bg-rest .progress-bar {
+  background: linear-gradient(90deg, var(--accent-cool-lo), var(--accent-cool));
+  box-shadow: 0 0 10px rgba(90, 128, 100, 0.5);
+}
+
+.fib-bg-done .progress-bar {
+  background: linear-gradient(90deg, #5a5a8a, var(--accent-done));
+  box-shadow: 0 0 10px rgba(123, 127, 186, 0.4);
+}
+
+.progress-wrap--tabata {
+  margin-bottom: 0.85rem;
+}
+
+.progress-bar--tabata {
+  background: linear-gradient(90deg, var(--accent-warm-lo), var(--accent-warm));
+  box-shadow: 0 0 10px rgba(217, 117, 72, 0.5);
+}
+
+.tabata-bg-rest .progress-bar--tabata {
+  background: linear-gradient(90deg, var(--accent-cool-lo), var(--accent-cool));
+  box-shadow: 0 0 10px rgba(90, 128, 100, 0.5);
+}
+
+/* ── Controls (buttons) ───────────────────────────────────────── */
+.controls {
+  display: flex;
+  gap: 10px;
+}
+
+.controls--tabata {
+  margin-top: 0;
+}
+
+button {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  background: var(--surface-2);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 14px 10px;
+  cursor: pointer;
+  box-shadow: var(--raised-sm);
+  transition: box-shadow 0.14s, color 0.14s, transform 0.14s;
+}
+
+button:hover:enabled {
+  color: var(--fg);
+  transform: translateY(-1px);
+  box-shadow: var(--raised);
+}
+
+button:active:enabled {
+  transform: none;
+  box-shadow: var(--pressed);
+  color: var(--fg-mute);
+}
+
+button:disabled {
+  color: var(--fg-dim);
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: var(--raised-sm);
+}
+
+/* Start — warm primary */
+#startBtn:not(:disabled),
+#tabStartBtn:not(:disabled) {
+  color: var(--accent-warm-hi);
+  box-shadow: var(--raised-sm), inset 0 0 0 1px rgba(217, 117, 72, 0.22);
+}
+#startBtn:not(:disabled):hover,
+#tabStartBtn:not(:disabled):hover {
+  box-shadow: var(--raised), inset 0 0 0 1px rgba(217, 117, 72, 0.32);
+}
+#startBtn:not(:disabled):active,
+#tabStartBtn:not(:disabled):active {
+  color: var(--accent-warm);
+  box-shadow: var(--pressed), inset 0 0 0 1px rgba(217, 117, 72, 0.4);
+}
+
+/* Pause — cool when available */
+#pauseBtn:not(:disabled),
+#tabPauseBtn:not(:disabled) {
+  color: var(--accent-cool-hi);
+  box-shadow: var(--raised-sm), inset 0 0 0 1px rgba(90, 128, 100, 0.22);
+}
+#pauseBtn:not(:disabled):hover,
+#tabPauseBtn:not(:disabled):hover {
+  box-shadow: var(--raised), inset 0 0 0 1px rgba(90, 128, 100, 0.32);
+}
+
+/* ── Tabata config inputs ─────────────────────────────────────── */
+.tabata-config {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tabata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tabata-field span {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+}
+
+.tabata-field input {
+  width: 100%;
+  background: var(--bg-deep);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 10px 6px;
+  font-family: var(--font-num);
+  font-size: 1.1rem;
+  font-weight: 500;
+  text-align: center;
+  color: var(--fg);
+  box-shadow: var(--inset);
+  outline: none;
+  transition: box-shadow 150ms;
+}
+.tabata-field input:focus {
+  box-shadow: var(--inset), 0 0 0 2px rgba(217, 117, 72, 0.28);
+}
+.tabata-field input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Card background states ───────────────────────────────────── */
+/* Cards keep their raised neumorphic surface.
+   Mood is expressed on the page background (body class) + dial inner tint.
+   These classes remain for CSS child selectors (pill, dial, progress). */
+.card--fibonacci.fib-bg-idle,
+.card--fibonacci.fib-bg-work,
+.card--fibonacci.fib-bg-rest,
+.card--fibonacci.fib-bg-done { /* card surface unchanged */ }
+
+.card--tabata.tabata-bg-idle,
+.card--tabata.tabata-bg-work,
+.card--tabata.tabata-bg-rest,
+.card--tabata.tabata-bg-done { /* card surface unchanged */ }
+
+/* ── Compact mode (timer running, both panels visible) ────────── */
+#view-timer.timer-running {
+  --dial-size:   220px;
+  --dial-inner:  174px;
+  --dial-sm:     170px;
+  --dial-inner-sm: 134px;
+}
+
 #view-timer.timer-running .card--fibonacci {
-  padding: 1.5rem 1.75rem;
+  padding: 1.35rem 1.5rem;
 }
 
-#view-timer.timer-running .block {
-  margin: 0.3rem 0 0.75rem;
+#view-timer.timer-running .dial-wrap {
+  margin-bottom: 1rem;
 }
 
-#view-timer.timer-running .fib-countdown {
-  margin-bottom: 0.6rem;
-}
-
-#view-timer.timer-running .controls {
-  margin-top: 1rem;
-}
-
-/* Mobile: stack columns and tighten further */
+/* ── Mobile stacked layout ────────────────────────────────────── */
 @media (max-width: 680px) {
   .timer-view-layout {
     gap: 0.75rem;
@@ -120,484 +779,44 @@ body.app-body {
     max-width: 100%;
   }
 
+  #view-timer.timer-running {
+    --dial-size:     195px;
+    --dial-inner:    155px;
+    --dial-sm:       155px;
+    --dial-inner-sm: 120px;
+  }
+
   #view-timer.timer-running .card--fibonacci {
-    padding: 1rem 1.25rem;
+    padding: 1rem 1.1rem;
   }
 
   #view-timer.timer-running h1 {
-    font-size: 1.1rem;
-    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    margin-bottom: 0.1rem;
   }
 
   #view-timer.timer-running .time {
-    font-size: clamp(2rem, 9vw, 3rem);
+    font-size: clamp(1.9rem, 10vw, 2.6rem);
   }
 
-  #view-timer.timer-running .block {
-    margin: 0.2rem 0 0.5rem;
+  #view-timer.timer-running .time--tabata {
+    font-size: clamp(1.6rem, 8vw, 2.1rem);
   }
 
-  #view-timer.timer-running .fib-countdown {
-    margin-bottom: 0.4rem;
+  #view-timer.timer-running .timer-header {
+    margin-bottom: 0.65rem;
   }
 
-  #view-timer.timer-running .controls {
-    margin-top: 0.65rem;
+  #view-timer.timer-running .dial-wrap {
+    margin-bottom: 0.75rem;
   }
-}
 
-.card {
-  width: 100%;
-  max-width: 520px;
-  background: var(--card);
-  border-radius: 20px;
-  padding: 2rem;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 12px 35px rgba(2, 6, 23, 0.35);
-  transition: background 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
-}
-
-.card--fibonacci {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.card--tabata {
-  max-width: 100%;
-  padding: 1.25rem 1.35rem;
-  border: 2px solid rgba(37, 99, 235, 0.35);
-  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.tabata-heading {
-  margin: 0 0 0.85rem;
-  text-align: center;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #93c5fd;
-}
-
-.tabata-config {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.tabata-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.tabata-field input {
-  width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 8px;
-  padding: 0.4rem 0.45rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  background: rgba(15, 23, 42, 0.65);
-}
-
-.tabata-field input:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.55);
-  outline-offset: 1px;
-}
-
-.tabata-field input:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.phase--tabata {
-  font-size: 1.05rem;
-}
-
-.time--tabata {
-  font-size: clamp(1.75rem, 6vw, 2.6rem);
-}
-
-.progress-wrap--tabata {
-  height: 10px;
-  margin-top: 0.25rem;
-}
-
-.controls--tabata {
-  margin-top: 1rem;
-}
-
-.controls--tabata button {
-  padding: 0.55rem 0.5rem;
-  font-size: 0.85rem;
-}
-
-h1 {
-  margin: 0 0 1rem;
-  text-align: center;
-  font-size: clamp(1.4rem, 3vw, 1.9rem);
-}
-
-.phase {
-  margin: 0;
-  text-align: center;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.time {
-  margin: 0.3rem 0 0;
-  text-align: center;
-  font-size: clamp(2.5rem, 10vw, 4rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-}
-
-.block {
-  text-align: center;
-  margin: 0.6rem 0 1.4rem;
-  color: var(--muted);
-}
-
-.fib-schedule {
-  margin: 0.35rem 0 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.fib-ends-at {
-  margin-top: 0.25rem;
-  margin-bottom: 1rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-
-.fib-countdown {
-  text-align: center;
-  margin: 0.2rem 0 1.2rem;
-  font-size: 1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-/* Fibonacci: exercise lists for 3 / 5 / 8 min work blocks */
-.fib-exercise-setup {
-  margin: 0 0 1.25rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.fib-exercise-fields {
-  display: grid;
-  gap: 0.9rem;
-}
-
-@media (min-width: 480px) {
-  .fib-exercise-fields {
-    grid-template-columns: repeat(3, 1fr);
+  #view-timer.timer-running .progress-wrap {
+    margin-bottom: 0.85rem;
   }
 }
 
-.fib-exercise-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-}
-
-.fib-exercise-block__label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.fib-exercise-add-row {
-  display: flex;
-  align-items: stretch;
-  gap: 0.35rem;
-}
-
-.fib-exercise-input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 10px;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-  background: rgba(15, 23, 42, 0.55);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
-.fib-exercise-input::placeholder {
-  color: rgba(148, 163, 184, 0.65);
-  font-weight: 500;
-}
-
-.fib-exercise-input:focus {
-  outline: none;
-  border-color: rgba(56, 189, 248, 0.55);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-}
-
-.fib-exercise-add-btn {
-  flex: 0 0 auto;
-  width: 2.35rem;
-  min-height: 2.35rem;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  font-size: 1.2rem;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-  color: #0f172a;
-  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
-  transition: transform 140ms ease, filter 140ms ease;
-}
-
-.fib-exercise-add-btn:hover {
-  filter: brightness(1.06);
-  transform: scale(1.04);
-}
-
-.fib-exercise-add-btn:active {
-  transform: scale(0.98);
-}
-
-.fib-exercise-list {
-  margin: 0.15rem 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text);
-  max-height: 8.5rem;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.fib-exercise-list-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem;
-  margin: 0.28rem 0;
-  animation: fib-exercise-item-in 0.22s ease;
-}
-
-@keyframes fib-exercise-item-in {
-  from {
-    opacity: 0;
-    transform: translateX(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.fib-exercise-list-item__text {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.fib-exercise-list-item__text::before {
-  content: "– ";
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.fib-exercise-remove {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.45rem;
-  height: 1.45rem;
-  margin-left: 0;
-  padding: 0;
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.35);
-  vertical-align: middle;
-  transition: background 140ms ease, border-color 140ms ease;
-}
-
-.fib-exercise-remove:hover {
-  background: rgba(185, 28, 28, 0.45);
-  border-color: rgba(248, 113, 113, 0.65);
-}
-
-.fib-current-exercise {
-  margin: 0.35rem 0 0.15rem;
-  text-align: center;
-  font-size: clamp(1.05rem, 3.6vw, 1.45rem);
-  font-weight: 800;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
-  color: var(--text);
-  text-wrap: balance;
-  white-space: pre-line;
-}
-
-.progress-wrap {
-  width: 100%;
-  height: 14px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.22);
-  overflow: hidden;
-}
-
-.progress-bar {
-  width: 0%;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), #22d3ee);
-  transition: width 220ms linear;
-}
-
-.progress-bar--tabata {
-  background: linear-gradient(90deg, var(--tab-accent), var(--tab-work));
-}
-
-.controls {
-  margin-top: 1.4rem;
-  display: flex;
-  gap: 0.7rem;
-}
-
-button {
-  flex: 1;
-  border: 0;
-  border-radius: 10px;
-  padding: 0.72rem 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  color: #0f172a;
-  background: #e2e8f0;
-  transition: transform 120ms ease, opacity 120ms ease;
-}
-
-button:hover:enabled {
-  transform: translateY(-1px);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Fibonacci card backgrounds (independent from body) */
-.card--fibonacci.fib-bg-work {
-  background: linear-gradient(160deg, rgba(69, 10, 10, 0.92), rgba(127, 29, 29, 0.88));
-  border-color: rgba(248, 113, 113, 0.35);
-}
-
-.card--fibonacci.fib-bg-rest {
-  background: linear-gradient(160deg, rgba(5, 46, 22, 0.92), rgba(20, 83, 45, 0.88));
-  border-color: rgba(74, 222, 128, 0.35);
-}
-
-.card--fibonacci.fib-bg-done {
-  background: linear-gradient(160deg, rgba(49, 46, 129, 0.92), rgba(91, 33, 182, 0.88));
-  border-color: rgba(167, 139, 250, 0.4);
-}
-
-.card--fibonacci.fib-bg-idle {
-  background: var(--card);
-  border-color: rgba(148, 163, 184, 0.18);
-}
-
-/* Tabata card backgrounds */
-.card--tabata.tabata-bg-work {
-  background: linear-gradient(155deg, rgba(30, 58, 138, 0.95), rgba(29, 78, 216, 0.88));
-  border-color: rgba(96, 165, 250, 0.45);
-}
-
-.card--tabata.tabata-bg-rest {
-  background: linear-gradient(155deg, rgba(113, 63, 18, 0.92), rgba(202, 138, 4, 0.85));
-  border-color: rgba(253, 224, 71, 0.45);
-}
-
-.card--tabata.tabata-bg-done {
-  background: linear-gradient(155deg, rgba(12, 74, 110, 0.95), rgba(14, 165, 233, 0.88));
-  border-color: rgba(56, 189, 248, 0.45);
-}
-
-.card--tabata.tabata-bg-idle {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(37, 99, 235, 0.35);
-}
-
-
-/* ===========================================================================
-   Navigation bar
-   =========================================================================== */
-
-.app-nav {
-  position: sticky;
-  top: 0;
-  z-index: 500;
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.65rem 1rem;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-}
-
-.nav-btn {
-  flex: 0 0 auto;
-  padding: 0.42rem 1.35rem;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
-}
-
-.nav-btn:hover:not(.nav-btn--active) {
-  color: var(--text);
-  border-color: rgba(148, 163, 184, 0.45);
-  background: rgba(30, 41, 59, 0.55);
-  transform: none;
-}
-
-.nav-btn--active {
-  color: #0f172a;
-  background: var(--accent);
-  border-color: transparent;
-}
-
-/* ===========================================================================
-   Dashboard view
-   =========================================================================== */
-
+/* ── Dashboard ────────────────────────────────────────────────── */
 .dash-wrapper {
   max-width: 560px;
   margin: 0 auto;
@@ -605,21 +824,19 @@ button:disabled {
 }
 
 .dash-title {
-  margin: 0 0 1.25rem;
+  margin: 0 0 0.2rem;
   font-size: clamp(1.3rem, 4vw, 1.7rem);
-  font-weight: 800;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--fg);
   letter-spacing: -0.01em;
 }
-
-/* ── KPI cards ── */
 
 .dash-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.7rem;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
-  max-width: 320px;
+  max-width: 300px;
 }
 
 .dash-card {
@@ -627,52 +844,56 @@ button:disabled {
   flex-direction: column;
   gap: 0.2rem;
   padding: 1rem 1.1rem 1.1rem;
-  background: var(--card);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--raised-sm);
 }
 
 .dash-card--highlight {
-  background: linear-gradient(145deg, rgba(56, 189, 248, 0.14), rgba(14, 165, 233, 0.08));
-  border-color: rgba(56, 189, 248, 0.28);
+  box-shadow: var(--raised-sm), inset 0 0 0 1px rgba(217, 117, 72, 0.18);
 }
 
 .dash-card__label {
-  font-size: 0.67rem;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
+  letter-spacing: 0.22em;
+  color: var(--fg-mute);
+  margin-bottom: 4px;
 }
 
 .dash-card__value {
-  font-size: clamp(1.45rem, 5vw, 2rem);
-  font-weight: 800;
-  color: var(--text);
+  font-family: var(--font-num);
+  font-size: clamp(1.6rem, 5vw, 2rem);
+  font-weight: 500;
+  color: var(--fg);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .dash-card--highlight .dash-card__value {
-  color: var(--accent);
+  color: var(--accent-warm-hi);
 }
 
 .dash-card__sub {
-  font-size: 0.7rem;
+  font-size: 10px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--fg-dim);
+  letter-spacing: 0.05em;
+  margin-top: 2px;
 }
 
-/* ── History list ── */
+.dash-history {
+  /* section wrapper */
+}
 
 .dash-history__title {
-  margin: 0 0 0.65rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.75rem;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
+  letter-spacing: 0.25em;
+  color: var(--fg-mute);
 }
 
 .dash-history__list {
@@ -685,22 +906,20 @@ button:disabled {
 }
 
 .dash-history__item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 0.75rem 0.9rem 0.8rem;
-  background: rgba(30, 41, 59, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.09);
-  border-radius: 10px;
-  animation: fib-exercise-item-in 0.18s ease;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--raised-sm);
+  padding: 14px 16px;
+  animation: item-in 0.18s ease;
 }
 
 .dash-history__date {
-  font-size: 0.78rem;
+  font-size: 11px;
+  letter-spacing: 0.18em;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
+  color: var(--accent-warm-hi);
+  margin-bottom: 10px;
 }
 
 .dash-day-table {
@@ -711,39 +930,38 @@ button:disabled {
 
 .dash-day-table th {
   text-align: left;
-  font-size: 0.65rem;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  padding: 0 0.4rem 0.3rem 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  letter-spacing: 0.2em;
+  color: var(--fg-dim);
+  padding: 0 0.4rem 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .dash-day-table td {
   padding: 0.25rem 0.4rem 0.1rem 0;
-  color: var(--text);
+  color: var(--fg);
+  font-size: 11.5px;
   vertical-align: top;
   width: 33.33%;
 }
 
 .dash-day-table td:empty::after {
   content: "—";
-  color: var(--muted);
-  opacity: 0.4;
+  color: var(--fg-dim);
+  opacity: 0.35;
 }
-
-/* ── Empty / error states ── */
 
 .dash-message {
   text-align: center;
   padding: 3rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--fg-mute);
   line-height: 1.6;
 }
 
 .dash-message--error {
-  color: var(--work);
+  color: var(--accent-warm);
 }

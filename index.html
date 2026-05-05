@@ -7,6 +7,9 @@
     <meta name="description" content="Fibonacci and Tabata workout timers — works offline as a PWA." />
     <title>Fibonacci & Tabata Timers</title>
     <link rel="manifest" href="manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
   </head>
@@ -22,8 +25,10 @@
     </button>
 
     <nav class="app-nav" aria-label="Main navigation">
-      <button type="button" class="nav-btn nav-btn--active" data-view="timer">Timer</button>
-      <button type="button" class="nav-btn" data-view="dashboard">Dashboard</button>
+      <div class="nav-tabs">
+        <button type="button" class="nav-btn nav-btn--active" data-view="timer">Timer</button>
+        <button type="button" class="nav-btn" data-view="dashboard">Dashboard</button>
+      </div>
     </nav>
 
     <div id="view-timer" class="app-view">
@@ -40,7 +45,7 @@
             <div class="fib-exercise-setup" aria-label="Exercises for 3, 5, and 8 minute work blocks">
               <div class="fib-exercise-fields">
                 <div class="fib-exercise-block" data-fib-block="core">
-                  <span class="fib-exercise-block__label">Core (3 min)</span>
+                  <div class="fib-exercise-block__label"><span>Core</span><span class="fib-block-time">3 min</span></div>
                   <div class="fib-exercise-add-row">
                     <input
                       id="fibInputCore"
@@ -63,7 +68,7 @@
                 </div>
 
                 <div class="fib-exercise-block" data-fib-block="bodyweight">
-                  <span class="fib-exercise-block__label">Bodyweight (5 min)</span>
+                  <div class="fib-exercise-block__label"><span>Bodyweight</span><span class="fib-block-time">5 min</span></div>
                   <div class="fib-exercise-add-row">
                     <input
                       id="fibInputBodyweight"
@@ -86,7 +91,7 @@
                 </div>
 
                 <div class="fib-exercise-block" data-fib-block="overload">
-                  <span class="fib-exercise-block__label">Overload (8 min)</span>
+                  <div class="fib-exercise-block__label"><span>Overload</span><span class="fib-block-time">8 min</span></div>
                   <div class="fib-exercise-add-row">
                     <input
                       id="fibInputOverload"
@@ -111,12 +116,19 @@
             </div>
 
             <div id="fibTimerDisplay" hidden>
-              <p id="phaseLabel" class="phase">Ready</p>
-              <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
-              <p id="timeLabel" class="time">00:00</p>
-              <p id="blockLabel" class="block">Block 0 of 5</p>
-              <p id="fibCountdown" class="fib-countdown" aria-label="Total remaining workout time">—</p>
-              <p id="fibEndsAt" class="block fib-schedule fib-ends-at" hidden aria-live="polite"></p>
+              <div class="timer-header">
+                <p id="blockLabel" class="block">Block 0 of 5</p>
+                <p id="phaseLabel" class="phase">Ready</p>
+              </div>
+
+              <div class="dial-wrap">
+                <div class="dial-inner">
+                  <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
+                  <p id="timeLabel" class="time">00:00</p>
+                  <p id="fibCountdown" class="fib-countdown" aria-label="Total remaining workout time">—</p>
+                  <p id="fibEndsAt" class="fib-ends-at" hidden aria-live="polite"></p>
+                </div>
+              </div>
 
               <div class="progress-wrap" aria-label="Fibonacci workout progress">
                 <div id="progressBar" class="progress-bar"></div>
@@ -154,9 +166,16 @@
               </label>
             </div>
 
-            <p id="tabPhaseLabel" class="phase phase--tabata">Ready</p>
-            <p id="tabTimeLabel" class="time time--tabata">00:00</p>
-            <p id="tabRoundLabel" class="block">Round 0 of 8</p>
+            <div class="timer-header">
+              <p id="tabRoundLabel" class="block">Round 0 of 8</p>
+              <p id="tabPhaseLabel" class="phase phase--tabata">Ready</p>
+            </div>
+
+            <div class="dial-wrap dial-wrap--sm">
+              <div class="dial-inner">
+                <p id="tabTimeLabel" class="time time--tabata">00:00</p>
+              </div>
+            </div>
 
             <div class="progress-wrap progress-wrap--tabata" aria-label="Tabata progress">
               <div id="tabProgressBar" class="progress-bar progress-bar--tabata"></div>
