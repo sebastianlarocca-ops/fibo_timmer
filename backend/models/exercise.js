@@ -9,6 +9,14 @@ const exerciseSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    lastPerformed: {
+      type: Date,
+      default: null,
+    },
+    daysPerformed: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

@@ -58,9 +58,11 @@ mongoose
     console.log("✅  Connected to MongoDB — database: fibo_workouts");
     app.listen(PORT, () => {
       console.log(`🚀  Server running → http://localhost:${PORT}`);
-      console.log(`   POST /api/workouts   — save a workout`);
-      console.log(`   GET  /api/workouts   — list recent workouts`);
-      console.log(`   GET  /health         — connection check`);
+      console.log(`   POST /api/workouts            — save a workout`);
+      console.log(`   GET  /api/workouts            — list recent workouts`);
+      console.log(`   GET  /api/exercises           — list exercises with stats`);
+      console.log(`   POST /api/exercises/backfill  — seed from existing workouts`);
+      console.log(`   GET  /health                  — connection check`);
     });
   })
   .catch((err) => {

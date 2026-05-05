@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Workout = require("../models/workout");
 const Exercise = require("../models/exercise");
+const { computeExerciseStats } = require("../utils/exerciseStats");
 
 // ---------------------------------------------------------------------------
 // POST /api/workouts
@@ -34,16 +35,17 @@ router.post("/", async (req, res) => {
 
     console.log(`[workout saved] id=${saved._id}  date=${saved.date.toISOString()}`);
 
-    // Upsert new exercises into the exercise database (lowercase, deduplicated)
+    // Upsert exercises with latest stats (lowercase, deduplicated)
     const allExercises = [...core, ...bodyweight, ...overload]
       .map((e) => String(e).trim().toLowerCase())
       .filter(Boolean);
     const unique = [...new Set(allExercises)];
     if (unique.length) {
       await Promise.all(
-        unique.map((name) =>
-          Exercise.updateOne({ name }, { $set: { name } }, { upsert: true })
-        )
+        unique.map(async (name) => {
+          const stats = await computeExerciseStats(name);
+          return Exercise.updateOne({ name }, { $set: { name, ...stats } }, { upsert: true });
+        })
       );
       console.log(`[exercises upserted] ${unique.join(", ")}`);
     }

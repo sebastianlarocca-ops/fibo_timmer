@@ -1107,6 +1107,11 @@ async function loadDashboard() {
 
 let _allExercises = [];
 
+function exFormatDate(isoStr) {
+  if (!isoStr) return "—";
+  return new Date(isoStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function renderExercises(exercises) {
   const list    = document.getElementById("exList");
   const msg     = document.getElementById("exMessage");
@@ -1124,11 +1129,16 @@ function renderExercises(exercises) {
   if (msg) msg.hidden = true;
   if (counter) counter.textContent = `${_allExercises.length} total`;
 
-  exercises.forEach((name) => {
-    const chip = document.createElement("span");
-    chip.className = "ex-chip";
-    chip.textContent = name;
-    list.appendChild(chip);
+  exercises.forEach(({ name, lastPerformed, daysPerformed }) => {
+    const card = document.createElement("div");
+    card.className = "ex-card";
+    card.innerHTML = `
+      <span class="ex-card__name">${name}</span>
+      <div class="ex-card__meta">
+        <span class="ex-card__last" title="Last performed">${exFormatDate(lastPerformed)}</span>
+        <span class="ex-card__days">${daysPerformed ?? 0} day${daysPerformed !== 1 ? "s" : ""}</span>
+      </div>`;
+    list.appendChild(card);
   });
 }
 
@@ -1138,12 +1148,11 @@ function setExercisesLoadingState() {
   if (counter) counter.textContent = "";
   if (!list) return;
   list.replaceChildren();
-  [70, 90, 120, 80, 110, 95].forEach((w) => {
-    const el = document.createElement("span");
-    el.className = "ex-skeleton";
-    el.style.width = `${w}px`;
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement("div");
+    el.className = "ex-card ex-card--skeleton";
     list.appendChild(el);
-  });
+  }
 }
 
 async function loadExercises() {
@@ -1176,7 +1185,7 @@ function initExercisesSearch() {
   if (!input) return;
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();
-    renderExercises(q ? _allExercises.filter((n) => n.includes(q)) : _allExercises);
+    renderExercises(q ? _allExercises.filter((e) => e.name.includes(q)) : _allExercises);
   });
 }
 
