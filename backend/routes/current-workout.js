@@ -7,7 +7,7 @@ router.get("/", async (req, res) => {
   try {
     const items = await CurrentWorkout.find()
       .sort({ createdAt: 1 })
-      .select("exercise block createdAt -__v");
+      .select("exercise block createdAt");
     return res.json(items);
   } catch (err) {
     console.error("[GET /api/current-workout] error:", err.message);
