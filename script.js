@@ -251,6 +251,14 @@ const fibExerciseLists = {
   overload: [],
 };
 
+// Parallel arrays that track the MongoDB _id for each exercise in fibExerciseLists.
+// null means the exercise came from localStorage (no DB id yet).
+const fibExerciseDbIds = {
+  core: [],
+  bodyweight: [],
+  overload: [],
+};
+
 const coreExercises = fibExerciseLists.core;
 const bodyweightExercises = fibExerciseLists.bodyweight;
 const overloadExercises = fibExerciseLists.overload;
@@ -392,12 +400,20 @@ function addExercise(type) {
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
+
+  const idx = fibExerciseLists[type].length;
   fibExerciseLists[type].push(text);
+  fibExerciseDbIds[type].push(null); // filled after async POST response
+
   input.value = "";
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
   updateExerciseCacheWith(text);
+
+  postExerciseToCurrentWorkout(text, type).then((id) => {
+    if (id) fibExerciseDbIds[type][idx] = id;
+  });
 }
 
 /**
@@ -407,10 +423,16 @@ function removeExercise(type, index) {
   if (!FIB_BLOCK_TYPES.includes(type)) return;
   const list = fibExerciseLists[type];
   if (index < 0 || index >= list.length) return;
+
+  const dbId = fibExerciseDbIds[type][index];
   list.splice(index, 1);
+  fibExerciseDbIds[type].splice(index, 1);
+
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
+
+  if (dbId) deleteExerciseFromCurrentWorkout(dbId);
 }
 
 function refreshFibWorkoutExerciseDisplay() {
@@ -647,6 +669,64 @@ function loadFromLocalStorage() {
   loadFibExerciseListsFromStorage();
 }
 
+// ---------------------------------------------------------------------------
+// currentWorkout API — cross-device exercise plan sync
+// ---------------------------------------------------------------------------
+
+async function postExerciseToCurrentWorkout(exercise, block) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/current-workout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exercise, block }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.id;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteExerciseFromCurrentWorkout(id) {
+  try {
+    await fetch(`${API_BASE_URL}/api/current-workout/${id}`, { method: "DELETE" });
+  } catch {
+    // silently swallow — local state is already updated
+  }
+}
+
+/**
+ * On startup, fetch the persisted exercise plan from the DB and overwrite
+ * local state so all devices stay in sync.
+ * Falls back silently to whatever localStorage already loaded.
+ */
+async function loadCurrentWorkoutFromDB() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/current-workout`);
+    if (!res.ok) return;
+    const items = await res.json(); // [{ _id, exercise, block, createdAt }]
+
+    // DB is authoritative — wipe local lists and repopulate
+    FIB_BLOCK_TYPES.forEach((type) => {
+      fibExerciseLists[type].length = 0;
+      fibExerciseDbIds[type].length = 0;
+    });
+
+    items.forEach(({ _id, exercise, block }) => {
+      if (!FIB_BLOCK_TYPES.includes(block)) return;
+      fibExerciseLists[block].push(exercise);
+      fibExerciseDbIds[block].push(_id);
+    });
+
+    persistFibExerciseLists(); // keep localStorage in sync
+    FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
+    refreshFibWorkoutExerciseDisplay();
+  } catch (err) {
+    console.warn("[currentWorkout] load failed — using localStorage:", err.message);
+  }
+}
+
 // --- Tabata: configurable sequence from inputs ---
 const tabWork = document.getElementById("tabWork");
 const tabRest = document.getElementById("tabRest");
@@ -851,6 +931,9 @@ initFibExerciseListsUi();
 // Initial paint
 fibonacciResetUi();
 tabataTimer.reset();
+
+// Sync exercise plan from DB (overwrites localStorage with authoritative state)
+loadCurrentWorkoutFromDB();
 
 // ===========================================================================
 // DASHBOARD
