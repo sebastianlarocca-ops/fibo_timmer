@@ -715,12 +715,13 @@ async function loadCurrentWorkoutFromDB() {
       const res = await fetch(`${API_BASE_URL}/api/current-workout`);
 
       if (!res.ok) {
-        setStatus(`⚠️ Server returned ${res.status} (attempt ${attempt})`);
+        const body = await res.json().catch(() => ({}));
+        setStatus(`⚠️ ${res.status}: ${body.error || "unknown error"} (attempt ${attempt})`);
         if (attempt < MAX_ATTEMPTS) {
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
           continue;
         }
-        setStatus(`❌ Sync failed: HTTP ${res.status}`);
+        setStatus(`❌ Sync failed: ${res.status} — ${body.error || "unknown error"}`);
         return;
       }
 

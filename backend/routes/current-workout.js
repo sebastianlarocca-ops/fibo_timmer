@@ -11,7 +11,7 @@ router.get("/", async (req, res) => {
     return res.json(items);
   } catch (err) {
     console.error("[GET /api/current-workout] error:", err.message);
-    return res.status(500).json({ error: "Failed to fetch current workout." });
+    return res.status(500).json({ error: err.message });
   }
 });
 
