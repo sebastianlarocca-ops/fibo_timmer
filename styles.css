@@ -658,6 +658,94 @@ h1 {
   box-shadow: 0 0 10px rgba(90, 128, 100, 0.5);
 }
 
+/* ── Workout plan summary (collapsible, shown when timer runs) ── */
+.fib-summary {
+  margin-bottom: 1.25rem;
+}
+
+.fib-summary__toggle {
+  /* override global button defaults */
+  flex: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-deep);
+  border-radius: var(--r-md);
+  box-shadow: var(--inset);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  transition: color 0.15s;
+}
+
+.fib-summary__toggle:hover:enabled {
+  color: var(--fg);
+  transform: none;
+  box-shadow: var(--inset);
+}
+
+.fib-summary__toggle:active:enabled {
+  transform: none;
+  box-shadow: var(--inset-deep);
+  color: var(--fg-mute);
+}
+
+.fib-summary__arrow {
+  font-size: 11px;
+  transition: transform 220ms ease;
+  flex-shrink: 0;
+}
+
+.fib-summary--open .fib-summary__arrow {
+  transform: rotate(180deg);
+}
+
+.fib-summary__body {
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: var(--bg-deep);
+  border-radius: var(--r-md);
+  box-shadow: var(--inset);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: item-in 0.18s ease;
+}
+
+.fib-summary__block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fib-summary__block-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--fg-mute);
+}
+
+.fib-summary__exercise {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  text-transform: capitalize;
+  line-height: 1.5;
+  padding-left: 8px;
+}
+
+.fib-summary__empty {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--fg-dim);
+  padding-left: 8px;
+}
+
 /* ── Controls (buttons) ───────────────────────────────────────── */
 .controls {
   display: flex;

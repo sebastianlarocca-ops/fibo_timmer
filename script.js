@@ -849,6 +849,75 @@ const tabataTimer = new WorkoutTimer({
   onCompleteBeep: playTabataCompleteSound,
 });
 
+// ---------------------------------------------------------------------------
+// Workout plan summary — collapsible panel shown while timer runs
+// ---------------------------------------------------------------------------
+
+const fibSummaryEl     = document.getElementById("fibSummary");
+const fibSummaryToggle = document.getElementById("fibSummaryToggle");
+const fibSummaryLabel  = document.getElementById("fibSummaryLabel");
+const fibSummaryBody   = document.getElementById("fibSummaryBody");
+
+let fibSummaryOpen = false;
+
+const FIB_BLOCK_LABELS = {
+  core:        "Core — 3 min",
+  bodyweight:  "Bodyweight — 5 min",
+  overload:    "Overload — 8 min",
+};
+
+function renderFibSummary() {
+  if (!fibSummaryBody) return;
+
+  // Collapsed label — list non-empty blocks
+  const filled = FIB_BLOCK_TYPES.filter((t) => fibExerciseLists[t].length > 0);
+  if (fibSummaryLabel) {
+    fibSummaryLabel.textContent = filled.length
+      ? filled.map((t) => `${t.charAt(0).toUpperCase() + t.slice(1)} (${fibExerciseLists[t].length})`).join(" · ")
+      : "No exercises planned";
+  }
+
+  // Body content
+  fibSummaryBody.replaceChildren();
+  FIB_BLOCK_TYPES.forEach((type) => {
+    const block = document.createElement("div");
+    block.className = "fib-summary__block";
+
+    const label = document.createElement("span");
+    label.className = "fib-summary__block-label";
+    label.textContent = FIB_BLOCK_LABELS[type];
+    block.appendChild(label);
+
+    const exercises = fibExerciseLists[type];
+    if (exercises.length) {
+      exercises.forEach((name) => {
+        const ex = document.createElement("span");
+        ex.className = "fib-summary__exercise";
+        ex.textContent = `• ${name}`;
+        block.appendChild(ex);
+      });
+    } else {
+      const empty = document.createElement("span");
+      empty.className = "fib-summary__empty";
+      empty.textContent = "—";
+      block.appendChild(empty);
+    }
+
+    fibSummaryBody.appendChild(block);
+  });
+}
+
+function setFibSummaryOpen(open) {
+  fibSummaryOpen = open;
+  if (fibSummaryBody) fibSummaryBody.hidden = !open;
+  if (fibSummaryEl)   fibSummaryEl.classList.toggle("fib-summary--open", open);
+  if (fibSummaryToggle) fibSummaryToggle.setAttribute("aria-expanded", String(open));
+}
+
+if (fibSummaryToggle) {
+  fibSummaryToggle.addEventListener("click", () => setFibSummaryOpen(!fibSummaryOpen));
+}
+
 // --- Wire controls (each timer isolated) ---
 startBtn.addEventListener("click", () => {
   const wasComplete = fibonacciTimer.isComplete();
@@ -857,6 +926,8 @@ startBtn.addEventListener("click", () => {
   if (wasComplete || idleBeforeStart) {
     fibonacciWorkoutEndAtMs = calculateWorkoutEndTime(Date.now()).getTime();
     renderFibonacci(fibonacciTimer);
+    renderFibSummary();      // populate with current exercise lists
+    setFibSummaryOpen(false); // always start collapsed
   }
 });
 pauseBtn.addEventListener("click", () => fibonacciTimer.pause());
