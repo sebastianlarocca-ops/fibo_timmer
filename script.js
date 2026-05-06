@@ -698,32 +698,51 @@ async function deleteExerciseFromCurrentWorkout(id) {
 
 /**
  * On startup, fetch the persisted exercise plan from the DB and overwrite
- * local state so all devices stay in sync.
- * Falls back silently to whatever localStorage already loaded.
+ * local state so all devices stay in sync. Retries on failure to handle
+ * Render free-tier cold starts (server can take up to ~60s to wake).
  */
 async function loadCurrentWorkoutFromDB() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/current-workout`);
-    if (!res.ok) return;
-    const items = await res.json(); // [{ _id, exercise, block, createdAt }]
+  const MAX_ATTEMPTS = 5;
+  const RETRY_DELAY_MS = 15_000;
 
-    // DB is authoritative — wipe local lists and repopulate
-    FIB_BLOCK_TYPES.forEach((type) => {
-      fibExerciseLists[type].length = 0;
-      fibExerciseDbIds[type].length = 0;
-    });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/current-workout`);
 
-    items.forEach(({ _id, exercise, block }) => {
-      if (!FIB_BLOCK_TYPES.includes(block)) return;
-      fibExerciseLists[block].push(exercise);
-      fibExerciseDbIds[block].push(_id);
-    });
+      if (!res.ok) {
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+        console.warn(`[currentWorkout] server returned ${res.status} after ${MAX_ATTEMPTS} attempts`);
+        return;
+      }
 
-    persistFibExerciseLists(); // keep localStorage in sync
-    FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
-    refreshFibWorkoutExerciseDisplay();
-  } catch (err) {
-    console.warn("[currentWorkout] load failed — using localStorage:", err.message);
+      const items = await res.json(); // [{ _id, exercise, block, createdAt }]
+
+      // DB is authoritative — wipe local lists and repopulate
+      FIB_BLOCK_TYPES.forEach((type) => {
+        fibExerciseLists[type].length = 0;
+        fibExerciseDbIds[type].length = 0;
+      });
+
+      items.forEach(({ _id, exercise, block }) => {
+        if (!FIB_BLOCK_TYPES.includes(block)) return;
+        fibExerciseLists[block].push(exercise);
+        fibExerciseDbIds[block].push(_id);
+      });
+
+      persistFibExerciseLists(); // keep localStorage in sync
+      FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
+      refreshFibWorkoutExerciseDisplay();
+      return;
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      } else {
+        console.warn("[currentWorkout] load failed after retries — using localStorage:", err.message);
+      }
+    }
   }
 }
 
