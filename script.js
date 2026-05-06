@@ -704,17 +704,23 @@ async function deleteExerciseFromCurrentWorkout(id) {
 async function loadCurrentWorkoutFromDB() {
   const MAX_ATTEMPTS = 5;
   const RETRY_DELAY_MS = 15_000;
+  const statusEl = document.getElementById("dbSyncStatus");
+  const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
+
+  setStatus("⏳ Syncing with DB…");
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      setStatus(`⏳ Syncing… (attempt ${attempt}/${MAX_ATTEMPTS})`);
       const res = await fetch(`${API_BASE_URL}/api/current-workout`);
 
       if (!res.ok) {
+        setStatus(`⚠️ Server returned ${res.status} (attempt ${attempt})`);
         if (attempt < MAX_ATTEMPTS) {
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
           continue;
         }
-        console.warn(`[currentWorkout] server returned ${res.status} after ${MAX_ATTEMPTS} attempts`);
+        setStatus(`❌ Sync failed: HTTP ${res.status}`);
         return;
       }
 
@@ -735,12 +741,14 @@ async function loadCurrentWorkoutFromDB() {
       persistFibExerciseLists(); // keep localStorage in sync
       FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
       refreshFibWorkoutExerciseDisplay();
+      setStatus(`✅ Synced — ${items.length} exercise(s) loaded`);
       return;
     } catch (err) {
+      setStatus(`⚠️ Error (attempt ${attempt}): ${err.message}`);
       if (attempt < MAX_ATTEMPTS) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       } else {
-        console.warn("[currentWorkout] load failed after retries — using localStorage:", err.message);
+        setStatus(`❌ Sync failed: ${err.message}`);
       }
     }
   }
