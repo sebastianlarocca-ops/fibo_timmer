@@ -742,7 +742,7 @@ async function loadCurrentWorkoutFromDB() {
       persistFibExerciseLists(); // keep localStorage in sync
       FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
       refreshFibWorkoutExerciseDisplay();
-      setStatus(`✅ Synced — ${items.length} exercise(s) loaded`);
+      setStatus(`Synced — ${items.length} exercise(s) loaded`);
       return;
     } catch (err) {
       setStatus(`⚠️ Error (attempt ${attempt}): ${err.message}`);
