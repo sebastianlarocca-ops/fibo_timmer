@@ -622,12 +622,69 @@ function initFibExerciseListsUi() {
 // ---------------------------------------------------------------------------
 
 /** Base URL of the Express backend. Change this to your Render URL when deployed. */
-const API_BASE_URL = "https://fibo-workout-backend.onrender.com";
+const API_BASE_URL = "https://angelic-dream-production-e221.up.railway.app";
+
+// ---------------------------------------------------------------------------
+// Pending workout queue — survives Render cold-start failures
+// ---------------------------------------------------------------------------
+
+const PENDING_WORKOUTS_KEY = "pendingWorkouts_v1";
+
+function readPendingWorkouts() {
+  try {
+    const raw = localStorage.getItem(PENDING_WORKOUTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingWorkouts(queue) {
+  try {
+    localStorage.setItem(PENDING_WORKOUTS_KEY, JSON.stringify(queue));
+  } catch { /* storage full */ }
+}
+
+function enqueuePendingWorkout(payload) {
+  const queue = readPendingWorkouts();
+  queue.push(payload);
+  writePendingWorkouts(queue);
+}
+
+async function flushPendingWorkouts() {
+  const queue = readPendingWorkouts();
+  if (!queue.length) return;
+
+  const remaining = [];
+  for (const payload of queue) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/workouts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log(`[API] Flushed pending workout — id: ${data.id}, date: ${payload.date}`);
+        // Bust the dashboard cache so the next visit shows fresh data
+        try { localStorage.removeItem(DASH_CACHE_KEY); } catch { /* ignore */ }
+      } else {
+        remaining.push(payload);
+      }
+    } catch {
+      remaining.push(payload); // still offline — try again next time
+    }
+  }
+  writePendingWorkouts(remaining);
+}
 
 /**
  * POST the current exercise lists + timestamp to /api/workouts.
  * Fires exactly once (via onCompleteBeep) when the Fibonacci timer finishes.
- * Errors are logged but never surface to the user — the app keeps working.
+ * If the server is unreachable, the payload is queued in localStorage and
+ * retried automatically on the next startup once the server is awake.
  */
 async function saveCompletedWorkoutToAPI() {
   const payload = {
@@ -648,14 +705,17 @@ async function saveCompletedWorkoutToAPI() {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.warn("[API] Failed to save workout:", err.error || res.status);
+      enqueuePendingWorkout(payload);
       return;
     }
 
     const data = await res.json();
     console.log(`[API] Workout saved to MongoDB — id: ${data.id}`);
+    // Bust the dashboard cache so the next visit shows today's workout
+    try { localStorage.removeItem(DASH_CACHE_KEY); } catch { /* ignore */ }
   } catch (err) {
-    // Network error or server offline — silently swallow so the app is unaffected
-    console.warn("[API] Could not reach workout server (offline?):", err.message);
+    console.warn("[API] Could not reach workout server — queued for retry:", err.message);
+    enqueuePendingWorkout(payload);
   }
 }
 
@@ -702,8 +762,8 @@ async function deleteExerciseFromCurrentWorkout(id) {
  * Render free-tier cold starts (server can take up to ~60s to wake).
  */
 async function loadCurrentWorkoutFromDB() {
-  const MAX_ATTEMPTS = 5;
-  const RETRY_DELAY_MS = 15_000;
+  const MAX_ATTEMPTS = 3;
+  const RETRY_DELAY_MS = 8_000;
   const statusEl = document.getElementById("dbSyncStatus");
   const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
 
@@ -743,6 +803,9 @@ async function loadCurrentWorkoutFromDB() {
       FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
       refreshFibWorkoutExerciseDisplay();
       setStatus(`Synced — ${items.length} exercise(s) loaded`);
+
+      // Server is awake — flush any workouts that failed to save previously
+      flushPendingWorkouts();
       return;
     } catch (err) {
       setStatus(`⚠️ Error (attempt ${attempt}): ${err.message}`);
