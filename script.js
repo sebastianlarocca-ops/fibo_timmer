@@ -713,6 +713,8 @@ async function saveCompletedWorkoutToAPI() {
     console.log(`[API] Workout saved to MongoDB — id: ${data.id}`);
     // Bust the dashboard cache so the next visit shows today's workout
     try { localStorage.removeItem(DASH_CACHE_KEY); } catch { /* ignore */ }
+    // Clear current-workout plan — it's no longer current
+    fetch(`${API_BASE_URL}/api/current-workout/all`, { method: "DELETE" }).catch(() => {});
   } catch (err) {
     console.warn("[API] Could not reach workout server — queued for retry:", err.message);
     enqueuePendingWorkout(payload);
