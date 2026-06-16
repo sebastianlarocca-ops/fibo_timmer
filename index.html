@@ -3,216 +3,256 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0f0f0f" />
     <meta name="description" content="Fibonacci and Tabata workout timers — works offline as a PWA." />
     <title>Fibonacci & Tabata Timers</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
   </head>
   <body class="app-body">
-    <button
-      type="button"
-      id="installAppBtn"
-      class="btn-install-app"
-      hidden
-      aria-label="Install workout timer app"
-    >
+
+    <button type="button" id="installAppBtn" class="btn-install-app" hidden aria-label="Install workout timer app">
       Install App
     </button>
 
+    <!-- ── Navigation ─────────────────────────────────────────────── -->
     <nav class="app-nav" aria-label="Main navigation">
-      <div class="nav-tabs">
+      <span class="app-nav__wordmark">WORKOUT</span>
+      <div class="nav-pills">
         <button type="button" class="nav-btn nav-btn--active" data-view="timer">Timer</button>
-        <button type="button" class="nav-btn" data-view="dashboard">Dashboard</button>
-        <button type="button" class="nav-btn" data-view="exercises">Exercises</button>
+        <button type="button" class="nav-btn" data-view="dashboard">Dash</button>
+        <button type="button" class="nav-btn" data-view="exercises">List</button>
       </div>
     </nav>
 
+    <!-- ══════════════════════════════════════════════ TIMER VIEW -->
     <div id="view-timer" class="app-view">
-      <div class="timer-view-layout">
+      <section id="fibonacciCard" class="fib-card fib-bg-idle" aria-labelledby="fibTitle">
 
-        <main class="fib-section">
-          <section
-            id="fibonacciCard"
-            class="card card--fibonacci fib-bg-idle"
-            aria-labelledby="fibTitle"
-          >
-            <h1 id="fibTitle">Fibonacci Workout Timer</h1>
-            <p id="dbSyncStatus" style="font-size:11px;color:#aaa;text-align:center;margin:0 0 8px;"></p>
+        <!-- Card header (always visible) -->
+        <div class="fib-card__head">
+          <h1 id="fibTitle">Fibonacci workout timer</h1>
+          <p id="dbSyncStatus" class="fib-sync-status"></p>
+        </div>
 
-            <div class="fib-exercise-setup" aria-label="Exercises for 3, 5, and 8 minute work blocks">
-              <div class="fib-exercise-fields">
-                <div class="fib-exercise-block" data-fib-block="core">
-                  <div class="fib-exercise-block__label"><span>Core</span><span class="fib-block-time">3 min</span></div>
-                  <div class="fib-exercise-add-row">
-                    <input
-                      id="fibInputCore"
-                      type="text"
-                      class="fib-exercise-input"
-                      maxlength="80"
-                      placeholder="Enter exercise..."
-                      autocomplete="off"
-                    />
-                    <button
-                      type="button"
-                      class="fib-exercise-add-btn"
-                      data-fib-add="core"
-                      aria-label="Add Core exercise"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <ul id="fibListCore" class="fib-exercise-list" aria-label="Core exercises"></ul>
-                </div>
+        <!-- ── SETUP MODE ─────────────────────────────────────────── -->
+        <div class="fib-exercise-setup" aria-label="Exercises for 3, 5, and 8 minute work blocks">
 
-                <div class="fib-exercise-block" data-fib-block="bodyweight">
-                  <div class="fib-exercise-block__label"><span>Bodyweight</span><span class="fib-block-time">5 min</span></div>
-                  <div class="fib-exercise-add-row">
-                    <input
-                      id="fibInputBodyweight"
-                      type="text"
-                      class="fib-exercise-input"
-                      maxlength="80"
-                      placeholder="Enter exercise..."
-                      autocomplete="off"
-                    />
-                    <button
-                      type="button"
-                      class="fib-exercise-add-btn"
-                      data-fib-add="bodyweight"
-                      aria-label="Add Bodyweight exercise"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <ul id="fibListBodyweight" class="fib-exercise-list" aria-label="Bodyweight exercises"></ul>
-                </div>
+          <div class="session-plan-bar">
+            <span class="session-plan-bar__label">SESSION PLAN</span>
+            <span class="session-plan-bar__summary" id="sessionPlanSummary">0 EXERCISES · 16 MIN</span>
+          </div>
 
-                <div class="fib-exercise-block" data-fib-block="overload">
-                  <div class="fib-exercise-block__label"><span>Overload</span><span class="fib-block-time">8 min</span></div>
-                  <div class="fib-exercise-add-row">
-                    <input
-                      id="fibInputOverload"
-                      type="text"
-                      class="fib-exercise-input"
-                      maxlength="80"
-                      placeholder="Enter exercise..."
-                      autocomplete="off"
-                    />
-                    <button
-                      type="button"
-                      class="fib-exercise-add-btn"
-                      data-fib-add="overload"
-                      aria-label="Add Overload exercise"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <ul id="fibListOverload" class="fib-exercise-list" aria-label="Overload exercises"></ul>
-                </div>
+          <div class="fib-exercise-fields">
+
+            <div class="fib-exercise-block" data-fib-block="core">
+              <div class="fib-exercise-block__label">
+                <span>Core</span><span class="fib-block-time">3 MIN</span>
               </div>
+              <div class="fib-exercise-add-row">
+                <input id="fibInputCore" type="text" class="fib-exercise-input"
+                  maxlength="80" placeholder="Add exercise…" autocomplete="off" />
+                <button type="button" class="fib-exercise-add-btn" data-fib-add="core" aria-label="Add Core exercise">+</button>
+              </div>
+              <ul id="fibListCore" class="fib-exercise-list" aria-label="Core exercises"></ul>
             </div>
 
-            <div id="fibTimerDisplay" hidden>
-              <div class="timer-header">
-                <p id="blockLabel" class="block">Block 0 of 5</p>
-                <p id="phaseLabel" class="phase">Ready</p>
+            <div class="fib-exercise-block" data-fib-block="bodyweight">
+              <div class="fib-exercise-block__label">
+                <span>Bodyweight</span><span class="fib-block-time">5 MIN</span>
               </div>
-
-              <div class="dial-wrap">
-                <div class="dial-inner">
-                  <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
-                  <p id="timeLabel" class="time">00:00</p>
-                  <p id="fibCountdown" class="fib-countdown" aria-label="Total remaining workout time">—</p>
-                  <p id="fibEndsAt" class="fib-ends-at" hidden aria-live="polite"></p>
-                </div>
+              <div class="fib-exercise-add-row">
+                <input id="fibInputBodyweight" type="text" class="fib-exercise-input"
+                  maxlength="80" placeholder="Add exercise…" autocomplete="off" />
+                <button type="button" class="fib-exercise-add-btn" data-fib-add="bodyweight" aria-label="Add Bodyweight exercise">+</button>
               </div>
-
-              <div class="progress-wrap" aria-label="Fibonacci workout progress">
-                <div id="progressBar" class="progress-bar"></div>
-              </div>
-
-              <div id="fibSummary" class="fib-summary">
-                <button type="button" class="fib-summary__toggle" id="fibSummaryToggle" aria-expanded="false">
-                  <span id="fibSummaryLabel" class="fib-summary__toggle-text">Workout Plan</span>
-                  <span class="fib-summary__arrow">▾</span>
-                </button>
-                <div class="fib-summary__body" id="fibSummaryBody" hidden></div>
-              </div>
+              <ul id="fibListBodyweight" class="fib-exercise-list" aria-label="Bodyweight exercises"></ul>
             </div>
 
-            <div class="controls">
-              <button id="startBtn" type="button">Start</button>
-              <button id="pauseBtn" type="button" disabled>Pause</button>
-              <button id="resetBtn" type="button">Reset</button>
+            <div class="fib-exercise-block" data-fib-block="overload">
+              <div class="fib-exercise-block__label">
+                <span>Overload</span><span class="fib-block-time">8 MIN</span>
+              </div>
+              <div class="fib-exercise-add-row">
+                <input id="fibInputOverload" type="text" class="fib-exercise-input"
+                  maxlength="80" placeholder="Add exercise…" autocomplete="off" />
+                <button type="button" class="fib-exercise-add-btn" data-fib-add="overload" aria-label="Add Overload exercise">+</button>
+              </div>
+              <ul id="fibListOverload" class="fib-exercise-list" aria-label="Overload exercises"></ul>
             </div>
-          </section>
-        </main>
 
-        <aside id="tabataPanel" class="tabata-panel" hidden>
-          <section
-            id="tabataCard"
-            class="card card--tabata tabata-bg-idle"
-            aria-labelledby="tabataHeading"
-          >
-            <h2 id="tabataHeading" class="tabata-heading">Tabata Timer</h2>
+          </div>
+        </div><!-- /fib-exercise-setup -->
 
-            <div class="tabata-config" id="tabataConfig">
+        <!-- ── RUNNING MODE ───────────────────────────────────────── -->
+        <div id="fibTimerDisplay" hidden>
+
+          <div class="timer-header">
+            <p id="blockLabel" class="block">BLOCK 0 / 5</p>
+            <p id="phaseLabel" class="phase">READY</p>
+          </div>
+
+          <!-- SVG Ring -->
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 280 280" aria-hidden="true">
+              <defs>
+                <linearGradient id="ringGradWork" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0"    stop-color="#ffcf6a"/>
+                  <stop offset="0.5"  stop-color="#ff6a2c"/>
+                  <stop offset="1"    stop-color="#c01f10"/>
+                </linearGradient>
+                <linearGradient id="ringGradRest" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0"    stop-color="#7de8d6"/>
+                  <stop offset="0.55" stop-color="#2ccfb4"/>
+                  <stop offset="1"    stop-color="#14705f"/>
+                </linearGradient>
+                <linearGradient id="ringGradDone" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#a0a4e8"/>
+                  <stop offset="1" stop-color="#7b7fba"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-track" cx="140" cy="140" r="116"/>
+              <circle class="ring-progress" id="fibRingProgress"
+                cx="140" cy="140" r="116" transform="rotate(-90 140 140)"/>
+            </svg>
+            <div class="ring-inner">
+              <p id="fibCurrentExercise" class="fib-current-exercise" hidden aria-live="polite"></p>
+              <p id="timeLabel" class="time">00:00</p>
+              <p id="fibCountdown" class="fib-countdown" aria-label="Total remaining workout time">—</p>
+              <p id="fibEndsAt" class="fib-ends-at" hidden aria-live="polite"></p>
+            </div>
+          </div>
+
+          <!-- Total-workout linear progress -->
+          <div class="progress-wrap" aria-label="Fibonacci workout progress">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+
+          <!-- Collapsible workout plan -->
+          <div id="fibSummary" class="fib-summary">
+            <button type="button" class="fib-summary__toggle" id="fibSummaryToggle" aria-expanded="false">
+              <span id="fibSummaryLabel" class="fib-summary__toggle-text">Workout Plan</span>
+              <span class="fib-summary__arrow">▾</span>
+            </button>
+            <div class="fib-summary__body" id="fibSummaryBody" hidden></div>
+          </div>
+
+        </div><!-- /fibTimerDisplay -->
+
+        <!-- ── CONTROLS ───────────────────────────────────────────── -->
+        <div class="controls">
+          <button id="startBtn" type="button" class="btn-start">Start ▶</button>
+          <div class="controls__row">
+            <button id="pauseBtn" type="button" class="btn-secondary" disabled>Pause</button>
+            <button id="resetBtn" type="button" class="btn-secondary">Reset</button>
+          </div>
+        </div>
+
+        <!-- Tabata pill (shows when Fibonacci is running) -->
+        <button type="button" id="tabataPill" class="tabata-pill" hidden aria-label="Open Tabata timer">
+          ⏱ Tabata
+        </button>
+
+      </section>
+    </div><!-- /view-timer -->
+
+    <!-- ══════════════════════════════════════════════ TABATA MODAL -->
+    <div id="tabataModal" class="tabata-modal" hidden role="dialog" aria-modal="true" aria-label="Tabata timer">
+      <div class="tabata-modal__scrim" id="tabataScrim"></div>
+      <div id="tabataPanel" class="tabata-modal__sheet">
+
+        <div class="tabata-modal__bar">
+          <div class="tabata-fib-pill">
+            Fibonacci · <span id="tabataFibTime">--:--</span>
+          </div>
+          <button type="button" class="tabata-modal__minimize-btn" id="tabataMinimize">
+            MINIMIZE ▾
+          </button>
+        </div>
+
+        <section id="tabataCard" class="tabata-card tabata-bg-idle">
+
+          <!-- Config (shown when idle / complete) -->
+          <div class="tabata-config" id="tabataConfig">
+            <p class="tabata-config__heading">INTERVAL TABATA</p>
+            <div class="tabata-config__fields">
               <label class="tabata-field">
-                <span>Work</span>
-                <input id="tabWork" type="number" min="1" max="999" value="20" />
+                <span class="tabata-field__label">WORK <em>seconds on</em></span>
+                <div class="tabata-stepper">
+                  <button type="button" class="tabata-step-btn" id="tabWorkDec" aria-label="Decrease work">−</button>
+                  <input id="tabWork" type="number" min="1" max="999" value="20" />
+                  <button type="button" class="tabata-step-btn" id="tabWorkInc" aria-label="Increase work">+</button>
+                </div>
               </label>
               <label class="tabata-field">
-                <span>Rest</span>
-                <input id="tabRest" type="number" min="1" max="999" value="10" />
+                <span class="tabata-field__label">REST <em>seconds off</em></span>
+                <div class="tabata-stepper">
+                  <button type="button" class="tabata-step-btn" id="tabRestDec" aria-label="Decrease rest">−</button>
+                  <input id="tabRest" type="number" min="1" max="999" value="10" />
+                  <button type="button" class="tabata-step-btn" id="tabRestInc" aria-label="Increase rest">+</button>
+                </div>
               </label>
               <label class="tabata-field">
-                <span>Rounds</span>
-                <input id="tabRounds" type="number" min="1" max="99" value="8" />
+                <span class="tabata-field__label">ROUNDS <em>total intervals</em></span>
+                <div class="tabata-stepper">
+                  <button type="button" class="tabata-step-btn" id="tabRoundsDec" aria-label="Decrease rounds">−</button>
+                  <input id="tabRounds" type="number" min="1" max="99" value="8" />
+                  <button type="button" class="tabata-step-btn" id="tabRoundsInc" aria-label="Increase rounds">+</button>
+                </div>
               </label>
             </div>
+            <p class="tabata-total-time">TOTAL TIME <span id="tabTotalTime">4:00 · 8 × 0:30</span></p>
+          </div><!-- /tabataConfig -->
 
+          <!-- Running display (shown when timer active) -->
+          <div class="tabata-running" id="tabataRunningDisplay" hidden>
             <div class="timer-header">
-              <p id="tabRoundLabel" class="block">Round 0 of 8</p>
-              <p id="tabPhaseLabel" class="phase phase--tabata">Ready</p>
+              <p id="tabRoundLabel" class="block">ROUND 0 / 8</p>
+              <p id="tabPhaseLabel" class="phase phase--tabata">READY</p>
             </div>
-
-            <div class="dial-wrap dial-wrap--sm">
-              <div class="dial-inner">
+            <div class="ring-wrap ring-wrap--sm">
+              <svg class="ring-svg ring-svg--sm" viewBox="0 0 200 200" aria-hidden="true">
+                <circle class="ring-track" cx="100" cy="100" r="84"/>
+                <circle class="ring-progress ring-progress--sm" id="tabRingProgress"
+                  cx="100" cy="100" r="84" transform="rotate(-90 100 100)"/>
+              </svg>
+              <div class="ring-inner ring-inner--sm">
                 <p id="tabTimeLabel" class="time time--tabata">00:00</p>
               </div>
             </div>
-
-            <div class="progress-wrap progress-wrap--tabata" aria-label="Tabata progress">
+            <div class="progress-wrap progress-wrap--sm" aria-label="Tabata progress">
               <div id="tabProgressBar" class="progress-bar progress-bar--tabata"></div>
             </div>
+          </div><!-- /tabataRunningDisplay -->
 
-            <div class="controls controls--tabata">
-              <button id="tabStartBtn" type="button">Start</button>
-              <button id="tabPauseBtn" type="button" disabled>Pause</button>
-              <button id="tabResetBtn" type="button">Reset</button>
+          <div class="controls controls--tabata">
+            <button id="tabStartBtn" type="button" class="btn-start">Start Tabata ▶</button>
+            <div class="controls__row">
+              <button id="tabPauseBtn" type="button" class="btn-secondary" disabled>Pause</button>
+              <button id="tabResetBtn" type="button" class="btn-secondary">Reset</button>
             </div>
-          </section>
-        </aside>
+          </div>
 
-      </div>
-    </div><!-- /view-timer -->
+        </section>
+      </div><!-- /tabata-modal__sheet -->
+    </div><!-- /tabataModal -->
 
-    <!-- ── Dashboard view ───────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════ DASHBOARD -->
     <div id="view-dashboard" class="app-view" hidden>
       <div class="dash-wrapper">
+        <p class="dash-overview-label">OVERVIEW</p>
         <h1 class="dash-title">Dashboard</h1>
 
         <div class="dash-cards" id="dashCards">
           <div class="dash-card dash-card--highlight">
-            <span class="dash-card__label">This Month</span>
+            <span class="dash-card__label">This month</span>
             <span class="dash-card__value" id="dashMonthCount">—</span>
-            <span class="dash-card__sub">workouts</span>
+            <span class="dash-card__sub">workouts logged</span>
           </div>
           <div class="dash-card">
             <span class="dash-card__label">Last Workout</span>
@@ -221,33 +261,25 @@
         </div>
 
         <section class="dash-history">
-          <h2 class="dash-history__title">Workout History</h2>
-          <ul id="dashHistoryList" class="dash-history__list" aria-label="Monthly workout history"></ul>
+          <h2 class="dash-history__title">History</h2>
+          <ul id="dashHistoryList" class="dash-history__list" aria-label="Workout history by day"></ul>
         </section>
 
         <p id="dashMessage" class="dash-message" hidden aria-live="polite"></p>
       </div>
     </div><!-- /view-dashboard -->
 
-    <!-- ── Exercises view ─────────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════ EXERCISES -->
     <div id="view-exercises" class="app-view" hidden>
       <div class="ex-wrapper">
         <div class="ex-header">
           <h1 class="ex-title">Exercises</h1>
           <span class="ex-count" id="exCount"></span>
         </div>
-
         <div class="ex-search-wrap">
-          <input
-            id="exSearch"
-            type="search"
-            class="ex-search"
-            placeholder="Filter exercises…"
-            autocomplete="off"
-            aria-label="Filter exercises"
-          />
+          <input id="exSearch" type="search" class="ex-search"
+            placeholder="Filter exercises…" autocomplete="off" aria-label="Filter exercises" />
         </div>
-
         <div id="exList" class="ex-list" aria-live="polite"></div>
         <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
       </div>

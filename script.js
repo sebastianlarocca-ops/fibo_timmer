@@ -409,6 +409,7 @@ function addExercise(type) {
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
+  updateSessionPlanSummary();
   updateExerciseCacheWith(text);
 
   postExerciseToCurrentWorkout(text, type).then((id) => {
@@ -431,6 +432,7 @@ function removeExercise(type, index) {
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
+  updateSessionPlanSummary();
 
   if (dbId) deleteExerciseFromCurrentWorkout(dbId);
 }
@@ -522,10 +524,11 @@ function setFibMode(mode) {
   if (fibExerciseSetup) fibExerciseSetup.hidden = !setup;
   if (fibTimerDisplay)  fibTimerDisplay.hidden  =  setup;
 
-  // Show Tabata panel only when the Fibonacci timer is active
-  const tabataPanel = document.getElementById("tabataPanel");
-  const viewTimer   = document.getElementById("view-timer");
-  if (tabataPanel) tabataPanel.hidden = setup;
+  // Tabata pill appears when Fibonacci is active (modal is separate)
+  const tabataPillBtn = document.getElementById("tabataPill");
+  if (tabataPillBtn) tabataPillBtn.hidden = setup;
+
+  const viewTimer = document.getElementById("view-timer");
   if (viewTimer)   viewTimer.classList.toggle("timer-running", !setup);
 }
 
@@ -543,6 +546,8 @@ function renderFibonacci(timer) {
     pauseBtn.disabled = true;
     updateFibonacciScheduleUi(timer);
     updateFibCurrentExerciseUi(timer);
+    updateFibRing(timer);
+    updateTabataFibTimeMirror();
     return;
   }
 
@@ -551,6 +556,7 @@ function renderFibonacci(timer) {
     setFibCardBackground("idle");
     startBtn.disabled = false;
     pauseBtn.disabled = true;
+    updateSessionPlanSummary();
     return;
   }
 
@@ -574,6 +580,8 @@ function renderFibonacci(timer) {
   pauseBtn.disabled = !timer.isRunning();
   updateFibonacciScheduleUi(timer);
   updateFibCurrentExerciseUi(timer);
+  updateFibRing(timer);
+  updateTabataFibTimeMirror();
 }
 
 const fibonacciTimer = new WorkoutTimer({
@@ -795,6 +803,7 @@ async function loadCurrentWorkoutFromDB() {
     persistFibExerciseLists(); // keep localStorage in sync
     FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
     refreshFibWorkoutExerciseDisplay();
+    updateSessionPlanSummary();
     setStatus(`Synced — ${items.length} exercise(s) loaded`);
 
     // Flush any workouts that failed to save previously
@@ -877,6 +886,10 @@ function renderTabata(timer) {
     tabWork.disabled = false;
     tabRest.disabled = false;
     tabRounds.disabled = false;
+    updateTabataRunningDisplay(false);
+    updateTabataRing(timer);
+    updateTabataPill(timer);
+    updateTabataTotalTime();
     return;
   }
 
@@ -891,6 +904,10 @@ function renderTabata(timer) {
     tabWork.disabled = false;
     tabRest.disabled = false;
     tabRounds.disabled = false;
+    updateTabataRunningDisplay(false);
+    updateTabataRing(timer);
+    updateTabataPill(timer);
+    updateTabataTotalTime();
     return;
   }
 
@@ -913,6 +930,9 @@ function renderTabata(timer) {
   tabWork.disabled = timer.isRunning();
   tabRest.disabled = timer.isRunning();
   tabRounds.disabled = timer.isRunning();
+  updateTabataRunningDisplay(true);
+  updateTabataRing(timer);
+  updateTabataPill(timer);
 }
 
 const tabataTimer = new WorkoutTimer({
@@ -1651,3 +1671,213 @@ function initNavigation() {
 
 initNavigation();
 initExercisesSearch();
+
+// ===========================================================================
+// REDESIGN — Ring timer, Tabata modal, session plan summary, steppers
+// ===========================================================================
+
+// ── SVG ring — Fibonacci ──────────────────────────────────────────────────
+
+const FIB_RING_C = 2 * Math.PI * 116; // matches r=116 in SVG
+
+function updateFibRing(timer) {
+  const ring = document.getElementById("fibRingProgress");
+  if (!ring) return;
+
+  if (timer.isComplete()) {
+    ring.style.strokeDashoffset = "0";
+    ring.setAttribute("stroke", "url(#ringGradDone)");
+    ring.style.filter = "drop-shadow(0 0 12px rgba(123,127,186,.5))";
+    return;
+  }
+
+  if (isFibIdleBeforeStart(timer)) {
+    ring.style.strokeDashoffset = FIB_RING_C;
+    ring.setAttribute("stroke", "url(#ringGradWork)");
+    ring.style.filter = "";
+    return;
+  }
+
+  const current = timer.sequence[timer.currentIndex];
+  const phaseTotalMs = current.durationSec * 1000;
+  const phaseElapsedMs = phaseTotalMs - timer.remainingMs;
+  const pct = Math.min(1, Math.max(0, phaseElapsedMs / phaseTotalMs));
+
+  ring.style.strokeDashoffset = FIB_RING_C * (1 - pct);
+
+  if (current.type === "work") {
+    ring.setAttribute("stroke", "url(#ringGradWork)");
+    ring.style.filter = "drop-shadow(0 0 14px rgba(255,106,44,.5))";
+  } else {
+    ring.setAttribute("stroke", "url(#ringGradRest)");
+    ring.style.filter = "drop-shadow(0 0 14px rgba(44,207,180,.4))";
+  }
+}
+
+// ── SVG ring — Tabata ────────────────────────────────────────────────────
+
+const TAB_RING_C = 2 * Math.PI * 84; // matches r=84 in SVG
+
+function updateTabataRing(timer) {
+  const ring = document.getElementById("tabRingProgress");
+  if (!ring) return;
+
+  if (timer.isComplete()) {
+    ring.style.strokeDashoffset = "0";
+    ring.setAttribute("stroke", "url(#ringGradDone)");
+    return;
+  }
+
+  if (isTabataIdleBeforeStart(timer)) {
+    ring.style.strokeDashoffset = TAB_RING_C;
+    ring.setAttribute("stroke", "url(#ringGradWork)");
+    return;
+  }
+
+  const current = timer.sequence[timer.currentIndex];
+  const phaseTotalMs = current.durationSec * 1000;
+  const phaseElapsedMs = phaseTotalMs - timer.remainingMs;
+  const pct = Math.min(1, Math.max(0, phaseElapsedMs / phaseTotalMs));
+
+  ring.style.strokeDashoffset = TAB_RING_C * (1 - pct);
+  ring.setAttribute("stroke", current.type === "work" ? "url(#ringGradWork)" : "url(#ringGradRest)");
+  ring.style.filter = current.type === "work"
+    ? "drop-shadow(0 0 10px rgba(255,106,44,.45))"
+    : "drop-shadow(0 0 10px rgba(44,207,180,.35))";
+}
+
+// ── Tabata running display (hide config, show ring) ──────────────────────
+
+function updateTabataRunningDisplay(isRunning) {
+  const config  = document.getElementById("tabataConfig");
+  const running = document.getElementById("tabataRunningDisplay");
+  if (config)  config.hidden  =  isRunning;
+  if (running) running.hidden = !isRunning;
+}
+
+// ── Tabata pill state ────────────────────────────────────────────────────
+
+function updateTabataPill(timer) {
+  const pill = document.getElementById("tabataPill");
+  if (!pill) return;
+
+  if (timer.isComplete()) {
+    pill.textContent = "⏱ Tabata — Done";
+    pill.className = "tabata-pill tabata-pill--done";
+    return;
+  }
+
+  if (isTabataIdleBeforeStart(timer)) {
+    pill.textContent = "⏱ Tabata";
+    pill.className = "tabata-pill";
+    return;
+  }
+
+  const current = timer.sequence[timer.currentIndex];
+  const phase = current.type === "work" ? "WORK" : "REST";
+  const time  = formatTime(Math.ceil(timer.remainingMs / 1000));
+  const round = tabataRoundFromIndex(timer.currentIndex, tabataMeta.rounds);
+  pill.textContent = `TABATA · ${phase} · ${time} · R${round}/${tabataMeta.rounds}`;
+  pill.className = `tabata-pill tabata-pill--running-${current.type}`;
+}
+
+// ── Fibonacci time mirror in Tabata modal top bar ────────────────────────
+
+function updateTabataFibTimeMirror() {
+  const el = document.getElementById("tabataFibTime");
+  if (!el) return;
+  if (fibonacciTimer.isComplete()) {
+    el.textContent = "done";
+    return;
+  }
+  el.textContent = formatTime(Math.ceil(fibonacciTimer.remainingMs / 1000));
+}
+
+// ── Session plan summary bar ─────────────────────────────────────────────
+
+function updateSessionPlanSummary() {
+  const el = document.getElementById("sessionPlanSummary");
+  if (!el) return;
+  const total = FIB_BLOCK_TYPES.reduce((n, t) => n + fibExerciseLists[t].length, 0);
+  el.textContent = `${total} EXERCISE${total !== 1 ? "S" : ""} · 16 MIN`;
+}
+
+// ── Tabata total time display ────────────────────────────────────────────
+
+function updateTabataTotalTime() {
+  const el = document.getElementById("tabTotalTime");
+  if (!el) return;
+  const work   = parseInt(tabWork.value,   10) || 20;
+  const rest   = parseInt(tabRest.value,   10) || 10;
+  const rounds = parseInt(tabRounds.value, 10) || 8;
+  const total  = rounds * (work + rest);
+  const min    = Math.floor(total / 60);
+  const sec    = total % 60;
+  const tStr   = sec > 0 ? `${min}:${String(sec).padStart(2, "0")}` : `${min}:00`;
+  el.textContent = `${tStr} · ${rounds} × ${work + rest}s`;
+}
+
+// ── Tabata stepper buttons ───────────────────────────────────────────────
+
+function initTabataSteppers() {
+  [
+    ["tabWorkDec",   "tabWorkInc",   "tabWork"],
+    ["tabRestDec",   "tabRestInc",   "tabRest"],
+    ["tabRoundsDec", "tabRoundsInc", "tabRounds"],
+  ].forEach(([decId, incId, inputId]) => {
+    const dec   = document.getElementById(decId);
+    const inc   = document.getElementById(incId);
+    const input = document.getElementById(inputId);
+    if (!dec || !inc || !input) return;
+
+    dec.addEventListener("click", () => {
+      const v = parseInt(input.value, 10);
+      if (v > parseInt(input.min, 10)) {
+        input.value = v - 1;
+        onTabataConfigChange();
+        updateTabataTotalTime();
+      }
+    });
+    inc.addEventListener("click", () => {
+      const v = parseInt(input.value, 10);
+      if (v < parseInt(input.max, 10)) {
+        input.value = v + 1;
+        onTabataConfigChange();
+        updateTabataTotalTime();
+      }
+    });
+  });
+
+  // Also update total time when typing directly
+  [tabWork, tabRest, tabRounds].forEach((input) => {
+    if (input) input.addEventListener("input", updateTabataTotalTime);
+  });
+}
+
+// ── Tabata modal open / close ────────────────────────────────────────────
+
+function openTabataModal() {
+  const modal = document.getElementById("tabataModal");
+  if (modal) modal.hidden = false;
+}
+
+function closeTabataModal() {
+  const modal = document.getElementById("tabataModal");
+  if (modal) modal.hidden = true;
+}
+
+(function initTabataModal() {
+  const pill     = document.getElementById("tabataPill");
+  const minimize = document.getElementById("tabataMinimize");
+  const scrim    = document.getElementById("tabataScrim");
+
+  if (pill)     pill.addEventListener("click", openTabataModal);
+  if (minimize) minimize.addEventListener("click", closeTabataModal);
+  if (scrim)    scrim.addEventListener("click", closeTabataModal);
+})();
+
+// ── Init ─────────────────────────────────────────────────────────────────
+
+initTabataSteppers();
+updateTabataTotalTime();
+updateSessionPlanSummary();
