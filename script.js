@@ -762,59 +762,43 @@ async function deleteExerciseFromCurrentWorkout(id) {
  * Render free-tier cold starts (server can take up to ~60s to wake).
  */
 async function loadCurrentWorkoutFromDB() {
-  const MAX_ATTEMPTS = 3;
-  const RETRY_DELAY_MS = 8_000;
   const statusEl = document.getElementById("dbSyncStatus");
   const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
 
   setStatus("⏳ Syncing with DB…");
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      setStatus(`⏳ Syncing… (attempt ${attempt}/${MAX_ATTEMPTS})`);
-      const res = await fetch(`${API_BASE_URL}/api/current-workout`);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/current-workout`);
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setStatus(`⚠️ ${res.status}: ${body.error || "unknown error"} (attempt ${attempt})`);
-        if (attempt < MAX_ATTEMPTS) {
-          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-          continue;
-        }
-        setStatus(`❌ Sync failed: ${res.status} — ${body.error || "unknown error"}`);
-        return;
-      }
-
-      const items = await res.json(); // [{ _id, exercise, block, createdAt }]
-
-      // DB is authoritative — wipe local lists and repopulate
-      FIB_BLOCK_TYPES.forEach((type) => {
-        fibExerciseLists[type].length = 0;
-        fibExerciseDbIds[type].length = 0;
-      });
-
-      items.forEach(({ _id, exercise, block }) => {
-        if (!FIB_BLOCK_TYPES.includes(block)) return;
-        fibExerciseLists[block].push(exercise);
-        fibExerciseDbIds[block].push(_id);
-      });
-
-      persistFibExerciseLists(); // keep localStorage in sync
-      FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
-      refreshFibWorkoutExerciseDisplay();
-      setStatus(`Synced — ${items.length} exercise(s) loaded`);
-
-      // Server is awake — flush any workouts that failed to save previously
-      flushPendingWorkouts();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setStatus(`❌ Sync failed: ${res.status} — ${body.error || "unknown error"}`);
       return;
-    } catch (err) {
-      setStatus(`⚠️ Error (attempt ${attempt}): ${err.message}`);
-      if (attempt < MAX_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-      } else {
-        setStatus(`❌ Sync failed: ${err.message}`);
-      }
     }
+
+    const items = await res.json(); // [{ _id, exercise, block, createdAt }]
+
+    // DB is authoritative — wipe local lists and repopulate
+    FIB_BLOCK_TYPES.forEach((type) => {
+      fibExerciseLists[type].length = 0;
+      fibExerciseDbIds[type].length = 0;
+    });
+
+    items.forEach(({ _id, exercise, block }) => {
+      if (!FIB_BLOCK_TYPES.includes(block)) return;
+      fibExerciseLists[block].push(exercise);
+      fibExerciseDbIds[block].push(_id);
+    });
+
+    persistFibExerciseLists(); // keep localStorage in sync
+    FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
+    refreshFibWorkoutExerciseDisplay();
+    setStatus(`Synced — ${items.length} exercise(s) loaded`);
+
+    // Flush any workouts that failed to save previously
+    flushPendingWorkouts();
+  } catch (err) {
+    setStatus(`❌ Sync failed: ${err.message}`);
   }
 }
 
