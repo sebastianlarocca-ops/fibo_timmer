@@ -1300,3 +1300,22 @@ tbody tr:nth-child(6) .ex-sk-cell { animation-delay: 0.20s; }
   .ring-wrap--sm { width: 180px; height: 180px; }
   .time { font-size: clamp(2.4rem, 14vw, 3rem); }
 }
+
+/* ── Banda de la guardia de escritura (SOLO v2 de prueba) ─────────
+   Borrar junto con DEV_BLOCK_WORKOUT_SAVE al promover a producción. */
+#devGuardBadge {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  padding: 6px 12px;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: #111;
+  background: #ffcf6a;
+  pointer-events: none;
+}

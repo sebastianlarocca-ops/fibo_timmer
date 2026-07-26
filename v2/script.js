@@ -783,6 +783,37 @@ function initFibExerciseListsUi() {
 /** Base URL of the Express backend. Change this to your Render URL when deployed. */
 const API_BASE_URL = "https://angelic-dream-production-e221.up.railway.app";
 
+// ---------------------------------------------------------------------------
+// ⚠️  GUARDIA DE ESCRITURA — SOLO PARA LA VERSIÓN DE PRUEBA (v2)
+// ---------------------------------------------------------------------------
+//
+// Con esto en `true`, completar un workout NO escribe en la base de producción:
+// se loguea el payload exacto que se habría mandado y se corta ahí. El resto de
+// la app (sync del plan, dashboard, exercises, autocomplete) sigue pegándole a
+// la API real, así que la paridad se puede verificar contra datos de verdad.
+//
+// Importante: el payload tampoco se encola en `pendingWorkouts_v1`, porque si no
+// se terminaría escribiendo en producción en el próximo arranque.
+//
+// Para probar el guardado de verdad: poné `false` acá, o desde la consola
+//   window.__ALLOW_WORKOUT_SAVE = true
+//
+// ANTES DE PROMOVER v2 A PRODUCCIÓN, BORRAR ESTE BLOQUE Y SUS DOS USOS.
+const DEV_BLOCK_WORKOUT_SAVE = true;
+
+function workoutSaveIsBlocked() {
+  if (window.__ALLOW_WORKOUT_SAVE === true) return false;
+  return DEV_BLOCK_WORKOUT_SAVE;
+}
+
+/** Banda fija arriba de todo para que la guardia nunca pase desapercibida. */
+function renderDevGuardBadge() {
+  if (!workoutSaveIsBlocked()) return;
+  const badge = document.createElement("div");
+  badge.id = "devGuardBadge";
+  badge.textContent = "v2 · guardia activa: completar un workout NO escribe en la DB";
+  document.body.appendChild(badge);
+}
 
 // ---------------------------------------------------------------------------
 // Pending workout queue — survives Render cold-start failures
@@ -816,6 +847,11 @@ function enqueuePendingWorkout(payload) {
 async function flushPendingWorkouts() {
   const queue = readPendingWorkouts();
   if (!queue.length) return;
+
+  if (workoutSaveIsBlocked()) {
+    console.warn(`[v2] Guardia activa — NO se flushearon ${queue.length} workout(s) pendiente(s).`);
+    return;
+  }
 
   const remaining = [];
   for (const payload of queue) {
@@ -854,6 +890,12 @@ async function saveCompletedWorkoutToAPI() {
     overload: [...fibExerciseLists.overload],
     durationSec: FIB_TOTAL_SEC,
   };
+
+  if (workoutSaveIsBlocked()) {
+    console.warn("[v2] Guardia activa — NO se hizo POST /api/workouts. Payload que se habría enviado:", payload);
+    try { localStorage.removeItem(DASH_CACHE_KEY); } catch { /* ignore */ }
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/workouts`, {
@@ -2135,6 +2177,7 @@ function bootstrap() {
   tabataTimer.reset();
   updateTabataTotalTime();
   updateSessionPlanSummary();
+  renderDevGuardBadge();
 
   // 3. Sync remoto (async) — la DB es autoritativa sobre el plan local,
   //    y su camino de éxito dispara el flush de workouts pendientes.
