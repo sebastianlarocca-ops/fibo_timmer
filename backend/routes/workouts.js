@@ -35,16 +35,31 @@ router.post("/", async (req, res) => {
 
     console.log(`[workout saved] id=${saved._id}  date=${saved.date.toISOString()}`);
 
-    // Upsert exercises with latest stats (lowercase, deduplicated)
-    const allExercises = [...core, ...bodyweight, ...overload]
-      .map((e) => String(e).trim().toLowerCase())
-      .filter(Boolean);
-    const unique = [...new Set(allExercises)];
+    // Upsert exercises with latest stats (lowercase, deduplicated).
+    // `modalidad` = bloque en el que se cargó el ejercicio en esta sesión.
+    // Si aparece en más de un bloque, gana el primero (core → bodyweight → overload).
+    const modalidadByName = new Map();
+    [
+      ["core", core],
+      ["bodyweight", bodyweight],
+      ["overload", overload],
+    ].forEach(([modalidad, listado]) => {
+      listado.forEach((e) => {
+        const n = String(e).trim().toLowerCase();
+        if (n && !modalidadByName.has(n)) modalidadByName.set(n, modalidad);
+      });
+    });
+
+    const unique = [...modalidadByName.keys()];
     if (unique.length) {
       await Promise.all(
         unique.map(async (name) => {
           const stats = await computeExerciseStats(name);
-          return Exercise.updateOne({ name }, { $set: { name, ...stats } }, { upsert: true });
+          return Exercise.updateOne(
+            { name },
+            { $set: { name, ...stats, modalidad: modalidadByName.get(name) } },
+            { upsert: true }
+          );
         })
       );
       console.log(`[exercises upserted] ${unique.join(", ")}`);

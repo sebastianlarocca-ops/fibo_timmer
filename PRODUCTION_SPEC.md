@@ -104,9 +104,13 @@ La normalización a minúsculas ocurre sólo al derivar `exercises`.
 | `name` | String | `unique`, `trim`, `lowercase` — siempre normalizado a minúsculas |
 | `lastPerformed` | Date | `null` por default |
 | `daysPerformed` | Number | Cantidad de **días calendario distintos** en que se hizo, no cantidad de sesiones |
+| `modalidad` | String | `"core"` \| `"bodyweight"` \| `"overload"` \| `null` (default). Bloque en el que se cargó el ejercicio la última vez |
 | `createdAt` / `updatedAt` | Date | `timestamps: true` |
 
 Se recalcula por upsert en cada `POST /api/workouts`.
+`modalidad` se deriva del bloque en el que vino el ejercicio en ese workout; si aparece en más de
+un bloque en la misma sesión gana el primero (`core` → `bodyweight` → `overload`). Un workout
+posterior **pisa** la modalidad anterior. También se puede fijar a mano vía `PATCH /api/exercises/:name`.
 
 ### 3.3 `currentworkouts` — plan de ejercicios de la sesión en curso
 
@@ -162,15 +166,26 @@ Error → `500 { error: "Failed to save workout." }`.
 Devuelve un workout o `404 { error: "Workout not found." }`. **No se usa desde el frontend.**
 
 ### `GET /api/exercises`
-Orden: `lastPerformed: -1`, luego `name: 1`. Proyección `name lastPerformed daysPerformed -_id`
-→ **no devuelve `_id`**.
+Orden: `lastPerformed: -1`, luego `name: 1`.
+Proyección `name lastPerformed daysPerformed modalidad -_id` → **no devuelve `_id`**.
 ```json
-[ { "name": "sit ups", "daysPerformed": 11, "lastPerformed": "2026-07-25T14:49:06.898Z" } ]
+[ { "name": "sit ups", "daysPerformed": 11, "lastPerformed": "2026-07-25T14:49:06.898Z", "modalidad": "core" } ]
 ```
+
+### `PATCH /api/exercises/:name`
+Clasifica manualmente la modalidad de un ejercicio ya existente. `:name` va URL-encodeado y se
+normaliza a minúsculas. Body: `{ "modalidad": "core" | "bodyweight" | "overload" | null }`.
+- `400` si la modalidad no es una de esas.
+- `404 { error: "Exercise not found." }` si el nombre no existe (**no crea ejercicios**).
+- `200` con el doc actualizado.
+
+Lo llama la pestaña List en cada cambio del `<select>` de modalidad.
 
 ### `POST /api/exercises/backfill`
 Reconstruye toda la colección `exercises` desde los `workouts` existentes. Idempotente (upsert).
 Carga todos los workouts en memoria y calcula en JS (evita N round-trips).
+También propone `modalidad` a partir del bloque del **workout más reciente** que incluye el
+ejercicio, pero **sólo la escribe si está vacía** — nunca pisa una clasificación manual.
 Respuesta: `{ "processed": <n> }`. **Herramienta de mantenimiento, el frontend no la llama.**
 
 ### `GET /api/current-workout`
@@ -651,23 +666,26 @@ Sin workouts → se ocultan las cards y aparece
 ### 12.1 Carga — `loadExercises()`
 
 Cada visita a la pestaña: oculta el mensaje, **limpia el campo de búsqueda**, muestra skeleton
-(6 filas con `<span class="ex-sk-cell">` de anchos `100/140/80/120/95/110 px`), y hace
+(6 filas de 4 celdas, con `<span class="ex-sk-cell">` de anchos `100/140/80/120/95/110 px`), y hace
 `GET /api/exercises`. Guarda todo en `_allExercises`.
 **Sin cache** — siempre pega a la red. Fallo → `"Could not load exercises — server may be offline."`.
 
 ### 12.2 Tabla
 
-Tres columnas, todas clickeables para ordenar:
+Cuatro columnas, todas clickeables para ordenar:
 
 | Columna | `key` | Contenido |
 |---|---|---|
 | Exercise | `name` | nombre (guardado en minúsculas; el CSS lo capitaliza) |
+| Modality | `modalidad` | `<select>` editable: `—` / `Core` / `Body` / `Over` |
 | Last | `lastPerformed` | `"Jul 25"` (`month short` + día), `"—"` si es `null` |
 | Days | `daysPerformed` | número, `0` si falta |
 
 **Orden inicial:** `lastPerformed` descendente.
 **Toggle:** click en la columna activa invierte la dirección; click en otra columna la activa con
-dirección default (`asc` para `name`, `desc` para las numéricas/fecha).
+dirección default (`asc` para `name` y `modalidad`, `desc` para las numéricas/fecha).
+**Orden por modalidad:** `core` → `bodyweight` → `overload` (invertido en `desc`), desempate por
+nombre; los **sin clasificar quedan siempre al final**, en las dos direcciones.
 Indicadores: `↕` inactiva, `↑`/`↓` activa; la `<th>` activa lleva `.ex-th--active`.
 El estado de orden (`_exSortKey`, `_exSortDir`) **sobrevive** al filtrado y a cambios de pestaña,
 pero no a un reload.
@@ -677,6 +695,17 @@ pero no a un reload.
 `#exSearch`, filtrado **client-side** en cada `input`: `name.includes(query.toLowerCase())`.
 Contador `#exCount` = `"N total"` (siempre el total sin filtrar).
 Sin resultados pero con datos cargados → `"No exercises match your search."` y el contador se vacía.
+
+### 12.4 Clasificación manual de modalidad
+
+Cada fila trae un `<select class="ex-mod-select">`. Al cambiarlo (`updateExerciseModalidad()`):
+1. Actualiza `_allExercises` **en el acto** (optimista) y deshabilita el select.
+2. `PATCH /api/exercises/<name URL-encodeado>` con `{ modalidad }` (`""` → `null`).
+3. Si falla: revierte el valor anterior en memoria y en el `<select>`, y muestra
+   `"Could not save modality for "<nombre>"."` en `#exMessage`.
+
+No re-renderiza la tabla al guardar — el orden no salta bajo el dedo mientras se clasifica.
+El select vacío lleva `.ex-mod-select--empty` (color apagado).
 
 > Mismo detalle de `innerHTML` sin escapar en las filas de la tabla.
 

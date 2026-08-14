@@ -1685,6 +1685,14 @@ let _allExercises = [];
 let _exSortKey = "lastPerformed";
 let _exSortDir = "desc";
 
+// Modalidad = bloque en el que se carga el ejercicio. Mismo orden que el timer.
+const EX_MODALIDADES = [
+  { value: "core",       label: "Core"    },
+  { value: "bodyweight", label: "Body"    },
+  { value: "overload",   label: "Over"    },
+];
+const EX_MODALIDAD_RANK = { core: 1, bodyweight: 2, overload: 3 };
+
 function exFormatDate(isoStr) {
   if (!isoStr) return "—";
   return new Date(isoStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -1701,12 +1709,86 @@ function sortExercises(list) {
     if (_exSortKey === "lastPerformed") {
       va = a.lastPerformed ? new Date(a.lastPerformed).getTime() : 0;
       vb = b.lastPerformed ? new Date(b.lastPerformed).getTime() : 0;
+    } else if (_exSortKey === "modalidad") {
+      // Sin clasificar siempre al final, sea cual sea la dirección.
+      va = EX_MODALIDAD_RANK[a.modalidad] ?? 0;
+      vb = EX_MODALIDAD_RANK[b.modalidad] ?? 0;
+      if (!va && !vb) return a.name.localeCompare(b.name);
+      if (!va) return 1;
+      if (!vb) return -1;
+      if (va === vb) return a.name.localeCompare(b.name);
     } else {
       va = a.daysPerformed ?? 0;
       vb = b.daysPerformed ?? 0;
     }
     return _exSortDir === "asc" ? va - vb : vb - va;
   });
+}
+
+/** Persist a manual modalidad change. Optimista: revierte si el PATCH falla. */
+async function updateExerciseModalidad(name, modalidad, select) {
+  const record = _allExercises.find((e) => e.name === name);
+  const previous = record ? record.modalidad ?? "" : "";
+  if (record) record.modalidad = modalidad || null;
+  select.classList.toggle("ex-mod-select--empty", !modalidad);
+  select.disabled = true;
+
+  const msg = document.getElementById("exMessage");
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/exercises/${encodeURIComponent(name)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modalidad: modalidad || null }),
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (msg) msg.hidden = true;
+  } catch (err) {
+    console.warn("[Exercises] modalidad update failed:", err.message);
+    if (record) record.modalidad = previous || null;
+    select.value = previous;
+    select.classList.toggle("ex-mod-select--empty", !previous);
+    if (msg) {
+      msg.textContent = `Could not save modality for "${name}".`;
+      msg.className   = "dash-message dash-message--error";
+      msg.hidden      = false;
+    }
+  } finally {
+    select.disabled = false;
+  }
+}
+
+function exModalidadCell(exercise) {
+  const td = document.createElement("td");
+  td.className = "ex-td ex-td--mod";
+
+  const select = document.createElement("select");
+  select.className = "ex-mod-select";
+  select.setAttribute("aria-label", `Modality for ${exercise.name}`);
+
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "—";
+  select.appendChild(blank);
+
+  EX_MODALIDADES.forEach(({ value, label }) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  });
+
+  const current = exercise.modalidad || "";
+  select.value = current;
+  select.classList.toggle("ex-mod-select--empty", !current);
+  select.addEventListener("change", () =>
+    updateExerciseModalidad(exercise.name, select.value, select)
+  );
+
+  td.appendChild(select);
+  return td;
 }
 
 function exArrow(key) {
@@ -1744,6 +1826,7 @@ function renderExercises(exercises) {
 
   const cols = [
     { key: "name",          label: "Exercise" },
+    { key: "modalidad",     label: "Modality" },
     { key: "lastPerformed", label: "Last"     },
     { key: "daysPerformed", label: "Days"     },
   ];
@@ -1757,7 +1840,7 @@ function renderExercises(exercises) {
         _exSortDir = _exSortDir === "asc" ? "desc" : "asc";
       } else {
         _exSortKey = key;
-        _exSortDir = key === "name" ? "asc" : "desc";
+        _exSortDir = key === "name" || key === "modalidad" ? "asc" : "desc";
       }
       const q = document.getElementById("exSearch")?.value.trim().toLowerCase() || "";
       renderExercises(q ? _allExercises.filter((e) => e.name.includes(q)) : _allExercises);
@@ -1769,11 +1852,19 @@ function renderExercises(exercises) {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  sorted.forEach(({ name, lastPerformed, daysPerformed }) => {
+  sorted.forEach((exercise) => {
+    const { name, lastPerformed, daysPerformed } = exercise;
     const tr = document.createElement("tr");
+
     // textContent, no innerHTML: `name` es input del usuario
+    const nameTd = document.createElement("td");
+    nameTd.className = "ex-td ex-td--name";
+    nameTd.textContent = name;
+    tr.appendChild(nameTd);
+
+    tr.appendChild(exModalidadCell(exercise));
+
     [
-      ["ex-td ex-td--name", name],
       ["ex-td ex-td--date", exFormatDate(lastPerformed)],
       ["ex-td ex-td--days", String(daysPerformed ?? 0)],
     ].forEach(([cls, value]) => {
@@ -1806,6 +1897,7 @@ function setExercisesLoadingState() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="ex-td"><span class="ex-sk-cell" style="width:${w}px"></span></td>
+      <td class="ex-td"><span class="ex-sk-cell" style="width:52px"></span></td>
       <td class="ex-td"><span class="ex-sk-cell" style="width:44px"></span></td>
       <td class="ex-td ex-td--days"><span class="ex-sk-cell" style="width:22px"></span></td>`;
     tbody.appendChild(tr);

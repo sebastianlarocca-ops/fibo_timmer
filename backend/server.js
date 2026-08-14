@@ -63,6 +63,7 @@ mongoose
       console.log(`   POST /api/workouts            — save a workout`);
       console.log(`   GET  /api/workouts            — list recent workouts`);
       console.log(`   GET  /api/exercises              — list exercises with stats`);
+      console.log(`   PATCH /api/exercises/:name       — set modalidad manually`);
       console.log(`   POST /api/exercises/backfill     — seed from existing workouts`);
       console.log(`   GET  /api/current-workout        — get current exercise plan`);
       console.log(`   POST /api/current-workout        — add one exercise to plan`);

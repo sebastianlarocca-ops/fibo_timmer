@@ -17,6 +17,12 @@ const exerciseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Bloque en el que se cargó el ejercicio por última vez.
+    modalidad: {
+      type: String,
+      enum: ["core", "bodyweight", "overload", null],
+      default: null,
+    },
   },
   {
     timestamps: true,
