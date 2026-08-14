@@ -707,6 +707,29 @@ Cada fila trae un `<select class="ex-mod-select">`. Al cambiarlo (`updateExercis
 No re-renderiza la tabla al guardar — el orden no salta bajo el dedo mientras se clasifica.
 El select vacío lleva `.ex-mod-select--empty` (color apagado).
 
+### 12.5 Click en la fila → suma al plan de la sesión
+
+Cada `<tr>` es `role="button"` + `tabIndex=0` y responde a click y a Enter/Espacio.
+`addExerciseFromList()` suma el ejercicio al bloque de su `modalidad` vía
+`addExerciseToPlan()` — el mismo camino que usa el input del Timer (memoria +
+localStorage + `POST /api/current-workout`), así que el plan queda sincronizado
+entre dispositivos igual que si se hubiera tipeado.
+
+Tres casos en los que **no** agrega, cada uno con su aviso:
+| Caso | Aviso |
+|---|---|
+| El ejercicio no tiene `modalidad` | `"<nombre>" no tiene modalidad asignada` |
+| Ya está en ese bloque del plan | `Ya está en <BLOQUE>` |
+| Click sobre el `<select>` de modalidad | (ninguno — se ignora el evento) |
+
+El `<select>` se excluye con `e.target.closest(".ex-mod-select")`, para que clasificar
+no dispare un alta sin querer.
+
+**Feedback:** `#exToast`, un aviso flotante `position: fixed` abajo y centrado, visible
+sin importar el scroll de la lista. Dura 2,2 s y se desvanece. Variante `--warn` (gris)
+para los casos que no agregan. Además la fila destella con `.ex-row--added` (0,6 s).
+El duplicado se chequea sólo acá; el input del Timer sigue permitiendo repetir.
+
 > Mismo detalle de `innerHTML` sin escapar en las filas de la tabla.
 
 ---

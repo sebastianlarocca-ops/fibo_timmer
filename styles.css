@@ -1284,6 +1284,54 @@ h1 {
 tbody tr:last-child .ex-td { border-bottom: none; }
 tbody tr:hover .ex-td { background: rgba(255,255,255,0.02); }
 
+/* ── Filas clickeables: suman el ejercicio al plan ──────────────── */
+.ex-row {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ex-row:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: -2px;
+}
+.ex-row:active .ex-td { background: rgba(255,106,44,0.10); }
+
+.ex-row--added .ex-td { animation: ex-added-flash 0.6s ease-out; }
+@keyframes ex-added-flash {
+  0%   { background: rgba(255,106,44,0.35); }
+  100% { background: transparent; }
+}
+
+/* ── Aviso flotante al sumar al plan ────────────────────────────── */
+.ex-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  max-width: min(90vw, 420px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--work);
+  color: #12100e;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+.ex-toast--show { opacity: 1; transform: translate(-50%, 0); }
+.ex-toast--warn { background: var(--surface-3); color: var(--fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-toast { transition: none; }
+  .ex-row--added .ex-td { animation: none; }
+}
+
 .ex-sk-cell {
   display: inline-block;
   height: 10px;

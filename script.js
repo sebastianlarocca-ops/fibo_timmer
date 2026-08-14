@@ -521,20 +521,22 @@ function renderExerciseList(type) {
 }
 
 /**
+ * Suma un ejercicio al plan de la sesión: estado en memoria, localStorage, DB,
+ * y refresca todo lo que lo muestra. Compartido por el input del Timer y por
+ * el click en una fila de la pestaña List.
+ * @param {string} name
  * @param {"core"|"bodyweight"|"overload"} type
+ * @returns {boolean} si se agregó
  */
-function addExercise(type) {
-  if (!FIB_BLOCK_TYPES.includes(type)) return;
-  const input = fibInputByType[type];
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
+function addExerciseToPlan(name, type) {
+  if (!FIB_BLOCK_TYPES.includes(type)) return false;
+  const text = String(name).trim();
+  if (!text) return false;
 
   const idx = fibExerciseLists[type].length;
   fibExerciseLists[type].push(text);
   fibExerciseDbIds[type].push(null); // filled after async POST response
 
-  input.value = "";
   persistFibExerciseLists();
   renderExerciseList(type);
   refreshFibWorkoutExerciseDisplay();
@@ -544,6 +546,18 @@ function addExercise(type) {
   postExerciseToCurrentWorkout(text, type).then((id) => {
     if (id) fibExerciseDbIds[type][idx] = id;
   });
+  return true;
+}
+
+/**
+ * @param {"core"|"bodyweight"|"overload"} type
+ */
+function addExercise(type) {
+  const input = fibInputByType[type];
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (addExerciseToPlan(text, type)) input.value = "";
 }
 
 /**
@@ -1692,6 +1706,56 @@ const EX_MODALIDADES = [
   { value: "overload",   label: "Over"    },
 ];
 const EX_MODALIDAD_RANK = { core: 1, bodyweight: 2, overload: 3 };
+// Nombre del bloque tal como aparece en la pantalla del Timer.
+const EX_BLOCK_LABEL = { core: "CORE", bodyweight: "BODYWEIGHT", overload: "OVERLOAD" };
+
+let _exToastHide = null;
+let _exToastClear = null;
+
+/** Aviso flotante, visible sin importar dónde esté scrolleada la lista. */
+function showExToast(message, isWarn = false) {
+  const el = document.getElementById("exToast");
+  if (!el) return;
+
+  clearTimeout(_exToastHide);
+  clearTimeout(_exToastClear);
+
+  el.textContent = message;
+  el.classList.toggle("ex-toast--warn", isWarn);
+  el.hidden = false;
+  void el.offsetWidth; // reinicia la transición si ya estaba visible
+  el.classList.add("ex-toast--show");
+
+  _exToastHide = setTimeout(() => {
+    el.classList.remove("ex-toast--show");
+    _exToastClear = setTimeout(() => { el.hidden = true; }, 250);
+  }, 2200);
+}
+
+/** Click en una fila de la lista → suma el ejercicio al bloque de su modalidad. */
+function addExerciseFromList(exercise, tr) {
+  const type = exercise.modalidad;
+
+  if (!type) {
+    showExToast(`"${exercise.name}" no tiene modalidad asignada`, true);
+    return;
+  }
+
+  const yaEsta = fibExerciseLists[type].some(
+    (x) => String(x).trim().toLowerCase() === exercise.name
+  );
+  if (yaEsta) {
+    showExToast(`Ya está en ${EX_BLOCK_LABEL[type]}`, true);
+    return;
+  }
+
+  if (!addExerciseToPlan(exercise.name, type)) return;
+
+  showExToast(`${exercise.name} → ${EX_BLOCK_LABEL[type]}`);
+  tr.classList.remove("ex-row--added");
+  void tr.offsetWidth; // reinicia la animación si se toca dos veces seguidas
+  tr.classList.add("ex-row--added");
+}
 
 function exFormatDate(isoStr) {
   if (!isoStr) return "—";
@@ -1855,6 +1919,24 @@ function renderExercises(exercises) {
   sorted.forEach((exercise) => {
     const { name, lastPerformed, daysPerformed } = exercise;
     const tr = document.createElement("tr");
+
+    // Toda la fila suma el ejercicio al plan; el <select> de modalidad queda
+    // excluido para que clasificar no dispare un alta sin querer.
+    tr.className = "ex-row";
+    tr.setAttribute("role", "button");
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-label", `Add ${name} to the session plan`);
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".ex-mod-select")) return;
+      addExerciseFromList(exercise, tr);
+    });
+    tr.addEventListener("keydown", (e) => {
+      if (e.target.closest(".ex-mod-select")) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        addExerciseFromList(exercise, tr);
+      }
+    });
 
     // textContent, no innerHTML: `name` es input del usuario
     const nameTd = document.createElement("td");
