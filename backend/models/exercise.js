@@ -23,6 +23,12 @@ const exerciseSchema = new mongoose.Schema(
       enum: ["core", "bodyweight", "overload", null],
       default: null,
     },
+    // Link a un video de referencia (http/https). Vacío = sin video cargado.
+    link: {
+      type: String,
+      default: null,
+      trim: true,
+    },
   },
   {
     timestamps: true,

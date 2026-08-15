@@ -1926,6 +1926,102 @@ async function updateExerciseModalidad(name, modalidad, select) {
   }
 }
 
+/**
+ * Guarda (o borra) el link de video. Optimista: revierte si el PATCH falla.
+ * Devuelve true si quedó guardado.
+ */
+async function updateExerciseLink(name, link) {
+  const record = _allExercises.find((e) => e.name === name);
+  const previous = record ? record.link ?? null : null;
+  if (record) record.link = link || null;
+  refreshExercisesView();
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/exercises/${encodeURIComponent(name)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ link: link || null }),
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showExToast(link ? `Link guardado en ${name}` : `Link borrado de ${name}`);
+    return true;
+  } catch (err) {
+    console.warn("[Exercises] link update failed:", err.message);
+    if (record) record.link = previous;
+    refreshExercisesView();
+    showExToast("No se pudo guardar el link", true);
+    return false;
+  }
+}
+
+/** Sólo http/https: el valor termina en un href que abre el navegador. */
+function isValidExLink(value) {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Pide el link por prompt. Vacío = borrar el que estaba. */
+function promptExerciseLink(exercise) {
+  const answer = window.prompt(`Link de video para "${exercise.name}"`, exercise.link || "https://");
+  if (answer === null) return; // cancelado
+
+  const value = answer.trim();
+  if (value === "" || value === "https://") {
+    if (exercise.link) updateExerciseLink(exercise.name, null);
+    return;
+  }
+  if (!isValidExLink(value)) {
+    showExToast("El link tiene que empezar con http:// o https://", true);
+    return;
+  }
+  updateExerciseLink(exercise.name, value);
+}
+
+function exLinkCell(exercise) {
+  const td = document.createElement("td");
+  td.className = "ex-td ex-td--link";
+
+  // Con link: ▶ abre el video en el navegador + lápiz chico para corregirlo.
+  // Sin link: sólo el lápiz, que lo carga desde la misma lista.
+  if (exercise.link) {
+    const open = document.createElement("a");
+    open.className = "ex-link-btn";
+    open.href = exercise.link;
+    open.target = "_blank";
+    open.rel = "noopener noreferrer";
+    open.title = exercise.link;
+    open.setAttribute("aria-label", `Open video for ${exercise.name}`);
+    open.textContent = "▶";
+
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "ex-link-edit";
+    edit.setAttribute("aria-label", `Edit video link for ${exercise.name}`);
+    edit.textContent = "✎";
+    edit.addEventListener("click", () => promptExerciseLink(exercise));
+
+    td.append(open, edit);
+    return td;
+  }
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "ex-link-btn ex-link-btn--empty";
+  add.setAttribute("aria-label", `Add video link for ${exercise.name}`);
+  add.textContent = "✎";
+  add.addEventListener("click", () => promptExerciseLink(exercise));
+
+  td.appendChild(add);
+  return td;
+}
+
 function exModalidadCell(exercise) {
   const td = document.createElement("td");
   td.className = "ex-td ex-td--mod";
@@ -2000,12 +2096,21 @@ function renderExercises(exercises) {
 
   const cols = [
     { key: "name",          label: "Exercise" },
+    { key: "link",          label: "Link", sortable: false },
     { key: "modalidad",     label: "Modality" },
     { key: "lastPerformed", label: "Last"     },
     { key: "daysPerformed", label: "Days"     },
   ];
 
-  cols.forEach(({ key, label }) => {
+  cols.forEach(({ key, label, sortable = true }) => {
+    if (!sortable) {
+      const th = document.createElement("th");
+      th.className = "ex-th ex-th--static";
+      th.textContent = label;
+      headerRow.appendChild(th);
+      return;
+    }
+
     const th = document.createElement("th");
     th.className = "ex-th" + (_exSortKey === key ? " ex-th--active" : "");
     th.innerHTML = `${label}${exArrow(key)}`;
@@ -2036,11 +2141,11 @@ function renderExercises(exercises) {
     tr.tabIndex = 0;
     tr.setAttribute("aria-label", `Add ${name} to the session plan`);
     tr.addEventListener("click", (e) => {
-      if (e.target.closest(".ex-mod-select")) return;
+      if (e.target.closest(".ex-mod-select, .ex-td--link")) return;
       addExerciseFromList(exercise, tr);
     });
     tr.addEventListener("keydown", (e) => {
-      if (e.target.closest(".ex-mod-select")) return;
+      if (e.target.closest(".ex-mod-select, .ex-td--link")) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         addExerciseFromList(exercise, tr);
@@ -2053,6 +2158,7 @@ function renderExercises(exercises) {
     nameTd.textContent = name;
     tr.appendChild(nameTd);
 
+    tr.appendChild(exLinkCell(exercise));
     tr.appendChild(exModalidadCell(exercise));
 
     [
@@ -2088,6 +2194,7 @@ function setExercisesLoadingState() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="ex-td"><span class="ex-sk-cell" style="width:${w}px"></span></td>
+      <td class="ex-td"><span class="ex-sk-cell" style="width:20px"></span></td>
       <td class="ex-td"><span class="ex-sk-cell" style="width:52px"></span></td>
       <td class="ex-td"><span class="ex-sk-cell" style="width:44px"></span></td>
       <td class="ex-td ex-td--days"><span class="ex-sk-cell" style="width:22px"></span></td>`;
@@ -2140,21 +2247,28 @@ async function submitNewExercise(event) {
 
   const nameEl = document.getElementById("exAddName");
   const modEl  = document.getElementById("exAddModalidad");
+  const linkEl = document.getElementById("exAddLink");
   const btn    = document.querySelector(".ex-add__btn");
   if (!nameEl || !modEl) return;
 
   const name = nameEl.value.trim();
   const modalidad = modEl.value;
+  const link = linkEl ? linkEl.value.trim() : "";
 
   if (!name) { showExToast("Escribí un nombre", true); nameEl.focus(); return; }
   if (!modalidad) { showExToast("Elegí una modalidad", true); modEl.focus(); return; }
+  if (link && !isValidExLink(link)) {
+    showExToast("El link tiene que empezar con http:// o https://", true);
+    linkEl.focus();
+    return;
+  }
 
   if (btn) btn.disabled = true;
   try {
     const res = await fetch(`${API_BASE_URL}/api/exercises`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, modalidad }),
+      body: JSON.stringify({ name, modalidad, link: link || null }),
     });
 
     if (res.status === 409) {
@@ -2169,6 +2283,7 @@ async function submitNewExercise(event) {
 
     nameEl.value = "";
     modEl.value = "";
+    if (linkEl) linkEl.value = "";
     refreshExercisesView();
     showExToast(`${created.name} → ${EX_BLOCK_LABEL[created.modalidad]}`);
     flashExerciseRow(created.name);

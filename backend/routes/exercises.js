@@ -5,13 +5,40 @@ const Workout = require("../models/workout");
 const { computeExerciseStats } = require("../utils/exerciseStats");
 
 const MODALIDADES = ["core", "bodyweight", "overload"];
+const EX_FIELDS = "name lastPerformed daysPerformed modalidad link -_id";
+
+/**
+ * Normaliza el link de video que manda el cliente.
+ * Devuelve { ok: true, value } o { ok: false, error }.
+ * Sólo http/https: cualquier otro esquema (javascript:, data:) se rechaza
+ * porque el link termina en un href que abre el navegador.
+ */
+function normalizeLink(raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === "") {
+    return { ok: true, value: null };
+  }
+  const value = String(raw).trim();
+  if (value.length > 500) {
+    return { ok: false, error: "link is too long (max 500 chars)." };
+  }
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return { ok: false, error: "link must be a valid URL." };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, error: "link must start with http:// or https://." };
+  }
+  return { ok: true, value };
+}
 
 // GET /api/exercises — return all exercises sorted by most recently performed
 router.get("/", async (req, res) => {
   try {
     const exercises = await Exercise.find()
       .sort({ lastPerformed: -1, name: 1 })
-      .select("name lastPerformed daysPerformed modalidad -_id");
+      .select(EX_FIELDS);
     return res.json(exercises);
   } catch (err) {
     console.error("[GET /api/exercises] error:", err.message);
@@ -34,9 +61,10 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const existing = await Exercise.findOne({ name }).select(
-      "name lastPerformed daysPerformed modalidad -_id"
-    );
+    const link = normalizeLink(req.body?.link);
+    if (!link.ok) return res.status(400).json({ error: link.error });
+
+    const existing = await Exercise.findOne({ name }).select(EX_FIELDS);
     if (existing) {
       return res.status(409).json({ error: "Exercise already exists.", exercise: existing });
     }
@@ -44,14 +72,16 @@ router.post("/", async (req, res) => {
     const created = await Exercise.create({
       name,
       modalidad,
+      link: link.value,
       daysPerformed: 0,
       lastPerformed: null,
     });
 
-    console.log(`[exercise created] ${name} (${modalidad})`);
+    console.log(`[exercise created] ${name} (${modalidad})${link.value ? " +link" : ""}`);
     return res.status(201).json({
       name: created.name,
       modalidad: created.modalidad,
+      link: created.link,
       daysPerformed: created.daysPerformed,
       lastPerformed: created.lastPerformed,
     });
@@ -65,34 +95,56 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PATCH /api/exercises/:name — clasificar manualmente la modalidad
+// PATCH /api/exercises/:name — clasificar la modalidad y/o cargar el link.
+// Sólo toca los campos que vengan en el body: un PATCH de link no pisa la
+// modalidad ya cargada, y viceversa.
 router.patch("/:name", async (req, res) => {
   try {
     const name = String(req.params.name || "").trim().toLowerCase();
-    const { modalidad } = req.body;
+    const body = req.body || {};
 
     if (!name) return res.status(400).json({ error: "Missing exercise name." });
 
-    const value =
-      modalidad === null || modalidad === "" || modalidad === undefined
-        ? null
-        : String(modalidad).trim().toLowerCase();
+    const $set = {};
 
-    if (value !== null && !MODALIDADES.includes(value)) {
-      return res.status(400).json({
-        error: `modalidad must be one of: ${MODALIDADES.join(", ")} (or null).`,
-      });
+    if ("modalidad" in body) {
+      const { modalidad } = body;
+      const value =
+        modalidad === null || modalidad === "" || modalidad === undefined
+          ? null
+          : String(modalidad).trim().toLowerCase();
+
+      if (value !== null && !MODALIDADES.includes(value)) {
+        return res.status(400).json({
+          error: `modalidad must be one of: ${MODALIDADES.join(", ")} (or null).`,
+        });
+      }
+      $set.modalidad = value;
+    }
+
+    if ("link" in body) {
+      const link = normalizeLink(body.link);
+      if (!link.ok) return res.status(400).json({ error: link.error });
+      $set.link = link.value;
+    }
+
+    if (!Object.keys($set).length) {
+      return res.status(400).json({ error: "Nothing to update: send modalidad and/or link." });
     }
 
     const updated = await Exercise.findOneAndUpdate(
       { name },
-      { $set: { modalidad: value } },
+      { $set },
       { new: true }
-    ).select("name lastPerformed daysPerformed modalidad -_id");
+    ).select(EX_FIELDS);
 
     if (!updated) return res.status(404).json({ error: "Exercise not found." });
 
-    console.log(`[exercise modalidad] ${name} → ${value ?? "null"}`);
+    console.log(
+      `[exercise patch] ${name} → ${Object.entries($set)
+        .map(([k, v]) => `${k}=${v ?? "null"}`)
+        .join(" ")}`
+    );
     return res.json(updated);
   } catch (err) {
     console.error("[PATCH /api/exercises/:name] error:", err.message);
