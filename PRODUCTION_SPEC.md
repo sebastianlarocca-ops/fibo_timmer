@@ -172,6 +172,15 @@ Proyección `name lastPerformed daysPerformed modalidad -_id` → **no devuelve 
 [ { "name": "sit ups", "daysPerformed": 11, "lastPerformed": "2026-07-25T14:49:06.898Z", "modalidad": "core" } ]
 ```
 
+### `POST /api/exercises`
+Alta manual. Body: `{ "name": "...", "modalidad": "core" | "bodyweight" | "overload" }`.
+Ambos obligatorios; el nombre se normaliza (trim + minúsculas).
+`daysPerformed` arranca en `0` y `lastPerformed` en `null` — los completa
+`POST /api/workouts` recién cuando el ejercicio aparece en un entrenamiento terminado.
+- `400` si falta el nombre o la modalidad no es válida.
+- `409 { error, exercise }` si ya existe (también ante colisión del índice único).
+- `201` con el ejercicio creado.
+
 ### `PATCH /api/exercises/:name`
 Clasifica manualmente la modalidad de un ejercicio ya existente. `:name` va URL-encodeado y se
 normaliza a minúsculas. Body: `{ "modalidad": "core" | "bodyweight" | "overload" | null }`.
@@ -707,7 +716,25 @@ Cada fila trae un `<select class="ex-mod-select">`. Al cambiarlo (`updateExercis
 No re-renderiza la tabla al guardar — el orden no salta bajo el dedo mientras se clasifica.
 El select vacío lleva `.ex-mod-select--empty` (color apagado).
 
-### 12.5 Click en la fila → suma al plan de la sesión
+### 12.5 Alta manual de ejercicios
+
+Formulario `#exAddForm` entre los chips y la tabla: nombre (texto, máx. 80) +
+`<select>` de modalidad + botón `+`. Al ser un `<form>`, Enter también envía.
+
+`submitNewExercise()` valida en el cliente (nombre no vacío, modalidad elegida) y
+hace `POST /api/exercises`. Con la respuesta: mete el ejercicio en `_allExercises`,
+lo suma al cache del autocompletado, limpia el formulario, re-renderiza, avisa por
+toast y trae la fila nueva a la vista destellando — que si no, con el orden por
+`lastPerformed` queda al fondo de la lista, invisible.
+
+| Caso | Aviso |
+|---|---|
+| Nombre vacío | `Escribí un nombre` |
+| Sin modalidad | `Elegí una modalidad` |
+| Ya existe (409) | `"<nombre>" ya existe` |
+| Falla la red | `No se pudo guardar — servidor caído?` |
+
+### 12.6 Click en la fila → suma al plan de la sesión
 
 Cada `<tr>` es `role="button"` + `tabIndex=0` y responde a click y a Enter/Espacio.
 `addExerciseFromList()` suma el ejercicio al bloque de su `modalidad` vía

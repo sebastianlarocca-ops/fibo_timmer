@@ -293,6 +293,17 @@
             Over <span class="ex-filter__count"></span>
           </button>
         </div>
+        <form id="exAddForm" class="ex-add" autocomplete="off">
+          <input id="exAddName" class="ex-add__name" type="text" maxlength="80"
+            placeholder="New exercise…" aria-label="New exercise name" />
+          <select id="exAddModalidad" class="ex-add__mod" aria-label="Modality for the new exercise">
+            <option value="">—</option>
+            <option value="core">Core</option>
+            <option value="bodyweight">Body</option>
+            <option value="overload">Over</option>
+          </select>
+          <button type="submit" class="ex-add__btn" aria-label="Add exercise">+</button>
+        </form>
         <div id="exList" class="ex-list" aria-live="polite"></div>
         <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
         <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>

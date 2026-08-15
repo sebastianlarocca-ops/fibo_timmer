@@ -19,6 +19,52 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST /api/exercises — alta manual de un ejercicio.
+// Sólo nombre + modalidad: `lastPerformed` y `daysPerformed` los completa el
+// sistema recién cuando el ejercicio aparece en un entrenamiento terminado.
+router.post("/", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim().toLowerCase();
+    const modalidad = String(req.body?.modalidad || "").trim().toLowerCase();
+
+    if (!name) return res.status(400).json({ error: "name is required." });
+    if (!MODALIDADES.includes(modalidad)) {
+      return res.status(400).json({
+        error: `modalidad must be one of: ${MODALIDADES.join(", ")}.`,
+      });
+    }
+
+    const existing = await Exercise.findOne({ name }).select(
+      "name lastPerformed daysPerformed modalidad -_id"
+    );
+    if (existing) {
+      return res.status(409).json({ error: "Exercise already exists.", exercise: existing });
+    }
+
+    const created = await Exercise.create({
+      name,
+      modalidad,
+      daysPerformed: 0,
+      lastPerformed: null,
+    });
+
+    console.log(`[exercise created] ${name} (${modalidad})`);
+    return res.status(201).json({
+      name: created.name,
+      modalidad: created.modalidad,
+      daysPerformed: created.daysPerformed,
+      lastPerformed: created.lastPerformed,
+    });
+  } catch (err) {
+    // Carrera contra el índice único: dos altas del mismo nombre a la vez
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Exercise already exists." });
+    }
+    console.error("[POST /api/exercises] error:", err.message);
+    return res.status(500).json({ error: "Failed to create exercise." });
+  }
+});
+
 // PATCH /api/exercises/:name — clasificar manualmente la modalidad
 router.patch("/:name", async (req, res) => {
   try {

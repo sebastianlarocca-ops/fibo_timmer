@@ -1254,6 +1254,67 @@ h1 {
   font-size: 9px;
 }
 
+/* ── Alta manual de ejercicios ──────────────────────────────────── */
+.ex-add {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ex-add__name {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--fg);
+  outline: none;
+  transition: border-color 150ms;
+}
+.ex-add__name::placeholder { color: var(--fg-dim); }
+.ex-add__name:focus { border-color: rgba(255,106,44,0.5); }
+
+.ex-add__mod {
+  flex: 0 0 auto;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 10px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 150ms, color 150ms;
+}
+.ex-add__mod:focus { border-color: rgba(255,106,44,0.5); }
+.ex-add__mod option { background: var(--surface); color: var(--fg); }
+
+.ex-add__btn {
+  flex: 0 0 auto;
+  width: 42px;
+  border: 1px solid rgba(255,106,44,0.45);
+  border-radius: var(--r-md);
+  background: rgba(255,106,44,0.14);
+  color: var(--work);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 150ms, opacity 150ms;
+}
+.ex-add__btn:hover { background: rgba(255,106,44,0.24); }
+.ex-add__btn:disabled { opacity: 0.45; cursor: progress; }
+
 .ex-table-wrap {
   background: var(--surface);
   border: 1px solid rgba(255,255,255,0.06);

@@ -2052,6 +2052,70 @@ function initExercisesSearch() {
   input.addEventListener("input", refreshExercisesView);
 }
 
+/**
+ * Alta manual de un ejercicio: sólo nombre + modalidad. `lastPerformed` y
+ * `daysPerformed` quedan vacíos hasta que el ejercicio aparezca en un
+ * entrenamiento terminado — de eso se encarga POST /api/workouts.
+ */
+async function submitNewExercise(event) {
+  event.preventDefault();
+
+  const nameEl = document.getElementById("exAddName");
+  const modEl  = document.getElementById("exAddModalidad");
+  const btn    = document.querySelector(".ex-add__btn");
+  if (!nameEl || !modEl) return;
+
+  const name = nameEl.value.trim();
+  const modalidad = modEl.value;
+
+  if (!name) { showExToast("Escribí un nombre", true); nameEl.focus(); return; }
+  if (!modalidad) { showExToast("Elegí una modalidad", true); modEl.focus(); return; }
+
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/exercises`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, modalidad }),
+    });
+
+    if (res.status === 409) {
+      showExToast(`"${name.toLowerCase()}" ya existe`, true);
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const created = await res.json();
+    _allExercises.push(created);
+    updateExerciseCacheWith(created.name);
+
+    nameEl.value = "";
+    modEl.value = "";
+    refreshExercisesView();
+    showExToast(`${created.name} → ${EX_BLOCK_LABEL[created.modalidad]}`);
+    flashExerciseRow(created.name);
+  } catch (err) {
+    console.warn("[Exercises] create failed:", err.message);
+    showExToast("No se pudo guardar — servidor caído?", true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/** Trae la fila recién creada a la vista y la destella (queda al final del orden). */
+function flashExerciseRow(name) {
+  const tr = [...document.querySelectorAll(".ex-row")].find(
+    (r) => r.children[0].textContent === name
+  );
+  if (!tr) return;
+  tr.scrollIntoView({ block: "center", behavior: "smooth" });
+  tr.classList.add("ex-row--added");
+}
+
+function initExerciseAddForm() {
+  document.getElementById("exAddForm")?.addEventListener("submit", submitNewExercise);
+}
+
 /** Chips de modalidad: uno por bloque + "All". Volver a tocar el activo lo limpia. */
 function initExercisesModalidadFilter() {
   const wrap = document.getElementById("exFilters");
@@ -2365,6 +2429,7 @@ function bootstrap() {
   initNavigation();
   initExercisesSearch();
   initExercisesModalidadFilter();
+  initExerciseAddForm();
 
   // 2. Primer render
   fibonacciResetUi();
