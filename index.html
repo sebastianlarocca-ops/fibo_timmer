@@ -279,6 +279,20 @@
           <input id="exSearch" type="search" class="ex-search"
             placeholder="Filter exercises…" autocomplete="off" aria-label="Filter exercises" />
         </div>
+        <div id="exFilters" class="ex-filters" role="group" aria-label="Filter by modality">
+          <button type="button" class="ex-filter" data-modalidad="" aria-pressed="true">
+            All <span class="ex-filter__count"></span>
+          </button>
+          <button type="button" class="ex-filter" data-modalidad="core" aria-pressed="false">
+            Core <span class="ex-filter__count"></span>
+          </button>
+          <button type="button" class="ex-filter" data-modalidad="bodyweight" aria-pressed="false">
+            Body <span class="ex-filter__count"></span>
+          </button>
+          <button type="button" class="ex-filter" data-modalidad="overload" aria-pressed="false">
+            Over <span class="ex-filter__count"></span>
+          </button>
+        </div>
         <div id="exList" class="ex-list" aria-live="polite"></div>
         <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
         <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>

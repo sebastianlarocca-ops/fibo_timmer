@@ -1698,6 +1698,21 @@ function initExerciseAutocomplete() {
 let _allExercises = [];
 let _exSortKey = "lastPerformed";
 let _exSortDir = "desc";
+let _exModalidadFilter = ""; // "" = todas
+
+/** Lo que se ve: cruce del buscador por nombre con el filtro de modalidad. */
+function visibleExercises() {
+  const q = document.getElementById("exSearch")?.value.trim().toLowerCase() || "";
+  return _allExercises.filter(
+    (e) =>
+      (!q || e.name.includes(q)) &&
+      (!_exModalidadFilter || e.modalidad === _exModalidadFilter)
+  );
+}
+
+function refreshExercisesView() {
+  renderExercises(visibleExercises());
+}
 
 // Modalidad = bloque en el que se carga el ejercicio. Mismo orden que el timer.
 const EX_MODALIDADES = [
@@ -1809,6 +1824,15 @@ async function updateExerciseModalidad(name, modalidad, select) {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (msg) msg.hidden = true;
+
+    // Con un filtro de modalidad activo, la fila reclasificada ya no pertenece
+    // a lo que se está viendo: se re-renderiza para que salga de la lista.
+    // Sin filtro no se re-renderiza, así el orden no salta bajo el dedo.
+    if (_exModalidadFilter && _exModalidadFilter !== (modalidad || null)) {
+      refreshExercisesView();
+    } else {
+      updateExerciseFilterChips();
+    }
   } catch (err) {
     console.warn("[Exercises] modalidad update failed:", err.message);
     if (record) record.modalidad = previous || null;
@@ -1868,14 +1892,22 @@ function renderExercises(exercises) {
   if (!list) return;
   list.replaceChildren();
 
+  updateExerciseFilterChips();
+
   if (!exercises.length && _allExercises.length) {
-    if (msg) { msg.textContent = "No exercises match your search."; msg.hidden = false; }
+    if (msg) { msg.textContent = "No exercises match the current filters."; msg.hidden = false; }
     if (counter) counter.textContent = "";
     return;
   }
 
   if (msg) msg.hidden = true;
-  if (counter) counter.textContent = `${_allExercises.length} total`;
+  // Con filtro activo el total sin filtrar solo confunde: se muestra el recorte.
+  if (counter) {
+    counter.textContent =
+      exercises.length === _allExercises.length
+        ? `${_allExercises.length} total`
+        : `${exercises.length} of ${_allExercises.length}`;
+  }
 
   const sorted = sortExercises(exercises);
 
@@ -1906,8 +1938,7 @@ function renderExercises(exercises) {
         _exSortKey = key;
         _exSortDir = key === "name" || key === "modalidad" ? "asc" : "desc";
       }
-      const q = document.getElementById("exSearch")?.value.trim().toLowerCase() || "";
-      renderExercises(q ? _allExercises.filter((e) => e.name.includes(q)) : _allExercises);
+      refreshExercisesView();
     });
     headerRow.appendChild(th);
   });
@@ -1994,6 +2025,7 @@ async function loadExercises() {
   const search = document.getElementById("exSearch");
   if (msg) msg.hidden = true;
   if (search) search.value = "";
+  _exModalidadFilter = ""; // arranca en "todas", igual que el buscador
 
   setExercisesLoadingState();
 
@@ -2001,7 +2033,7 @@ async function loadExercises() {
     const res = await fetch(`${API_BASE_URL}/api/exercises`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _allExercises = await res.json();
-    renderExercises(_allExercises);
+    refreshExercisesView();
   } catch (err) {
     console.warn("[Exercises] fetch failed:", err.message);
     const list = document.getElementById("exList");
@@ -2017,9 +2049,38 @@ async function loadExercises() {
 function initExercisesSearch() {
   const input = document.getElementById("exSearch");
   if (!input) return;
-  input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
-    renderExercises(q ? _allExercises.filter((e) => e.name.includes(q)) : _allExercises);
+  input.addEventListener("input", refreshExercisesView);
+}
+
+/** Chips de modalidad: uno por bloque + "All". Volver a tocar el activo lo limpia. */
+function initExercisesModalidadFilter() {
+  const wrap = document.getElementById("exFilters");
+  if (!wrap) return;
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".ex-filter");
+    if (!btn) return;
+    const value = btn.dataset.modalidad || "";
+    _exModalidadFilter = value && value === _exModalidadFilter ? "" : value;
+    refreshExercisesView();
+  });
+}
+
+/** Marca el chip activo y actualiza el contador de cada uno. */
+function updateExerciseFilterChips() {
+  const wrap = document.getElementById("exFilters");
+  if (!wrap) return;
+  wrap.querySelectorAll(".ex-filter").forEach((btn) => {
+    const value = btn.dataset.modalidad || "";
+    const activo = value === _exModalidadFilter;
+    btn.classList.toggle("ex-filter--active", activo);
+    btn.setAttribute("aria-pressed", String(activo));
+
+    const countEl = btn.querySelector(".ex-filter__count");
+    if (countEl) {
+      countEl.textContent = value
+        ? _allExercises.filter((x) => x.modalidad === value).length
+        : _allExercises.length;
+    }
   });
 }
 
@@ -2303,6 +2364,7 @@ function bootstrap() {
   initTabataModal();
   initNavigation();
   initExercisesSearch();
+  initExercisesModalidadFilter();
 
   // 2. Primer render
   fibonacciResetUi();

@@ -1216,6 +1216,44 @@ h1 {
 .ex-search::placeholder { color: var(--fg-dim); }
 .ex-search:focus { border-color: rgba(255,106,44,0.5); }
 
+/* ── Filtro por modalidad ───────────────────────────────────────── */
+.ex-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ex-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--fg-mute);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.ex-filter:hover { color: var(--fg); }
+.ex-filter--active {
+  background: rgba(255,106,44,0.14);
+  border-color: rgba(255,106,44,0.5);
+  color: var(--work);
+}
+.ex-filter__count {
+  display: inline-block;
+  margin-left: 3px;
+  opacity: 0.55;
+  font-size: 9px;
+}
+
 .ex-table-wrap {
   background: var(--surface);
   border: 1px solid rgba(255,255,255,0.06);
