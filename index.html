@@ -257,7 +257,17 @@
             <span class="dash-card__label">Last Workout</span>
             <span class="dash-card__value" id="dashLastDays">—</span>
           </div>
+          <div class="dash-card dash-card--wide">
+            <span class="dash-card__label">Avg / month</span>
+            <span class="dash-card__value" id="dashAvgPerMonth">—</span>
+            <span class="dash-card__sub">workouts per month · last 6 months</span>
+          </div>
         </div>
+
+        <section class="dash-months" id="dashMonths">
+          <h2 class="dash-history__title">Last 6 months</h2>
+          <ul id="dashMonthsList" class="dash-months__list" aria-label="Workouts per month"></ul>
+        </section>
 
         <section class="dash-history">
           <h2 class="dash-history__title">History</h2>

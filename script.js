@@ -1314,11 +1314,38 @@ function dashDaysSince(isoStr) {
   return Math.floor((Date.now() - new Date(isoStr).getTime()) / 86_400_000);
 }
 
+function dashMonthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Últimos 6 meses (el actual incluido), del más viejo al más nuevo:
+ * [{ key, label, count }]
+ */
+function lastSixMonths(byMonth) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const out = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(currentYear, now.getMonth() - i, 1);
+    const key = dashMonthKey(d);
+    const short = MONTH_NAMES[d.getMonth()].slice(0, 3);
+    out.push({
+      key,
+      label: d.getFullYear() === currentYear
+        ? short
+        : `${short} '${String(d.getFullYear()).slice(-2)}`,
+      count: byMonth[key] ?? 0,
+    });
+  }
+  return out;
+}
+
 /** Returns { "YYYY-MM": count } for every workout */
 function groupByMonth(workouts) {
   return workouts.reduce((acc, w) => {
-    const d = new Date(w.date);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const key = dashMonthKey(new Date(w.date));
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
@@ -1374,7 +1401,8 @@ function calcStreak(workouts) {
 // ── Data fetching ────────────────────────────────────────────────────────────
 
 async function fetchAllWorkouts() {
-  const res = await fetch(`${API_BASE_URL}/api/workouts?limit=100`);
+  // 400 para que el resumen de los últimos 6 meses no quede truncado
+  const res = await fetch(`${API_BASE_URL}/api/workouts?limit=400`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.json();
   return Array.isArray(body) ? body : (body.workouts ?? []);
@@ -1382,7 +1410,8 @@ async function fetchAllWorkouts() {
 
 // ── Dashboard cache (localStorage) ──────────────────────────────────────────
 
-const DASH_CACHE_KEY = "dashCache_v1";
+// v2: el cache viejo guardaba sólo 100 workouts — insuficiente para 6 meses
+const DASH_CACHE_KEY = "dashCache_v2";
 const DASH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function readDashCache() {
@@ -1409,9 +1438,12 @@ function computeDashStats(workouts) {
   if (!workouts.length) return null;
 
   const sorted = [...workouts].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const now    = new Date();
-  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const curKey = dashMonthKey(new Date());
   const byMonth = groupByMonth(workouts);
+
+  // Promedio sobre los 6 meses listados (el actual, parcial, incluido)
+  const months = lastSixMonths(byMonth);
+  const total  = months.reduce((sum, m) => sum + m.count, 0);
 
   return {
     firstDate:      sorted[0].date,
@@ -1420,6 +1452,8 @@ function computeDashStats(workouts) {
     thisMonthCount: byMonth[curKey] ?? 0,
     streak:         calcStreak(workouts),
     byMonth,
+    months,
+    avgPerMonth:    total / months.length,
   };
 }
 
@@ -1430,9 +1464,43 @@ function setDashText(id, text) {
   if (el) el.textContent = text;
 }
 
+/** Lista de los últimos 6 meses con su cantidad de entrenamientos */
+function renderDashMonths(months) {
+  const list = document.getElementById("dashMonthsList");
+  if (!list) return;
+
+  list.replaceChildren();
+  const max = Math.max(...months.map((m) => m.count), 1);
+
+  months.forEach(({ label, count }) => {
+    const li = document.createElement("li");
+    li.className = "dash-month";
+
+    const name = document.createElement("span");
+    name.className = "dash-month__label";
+    name.textContent = label;
+
+    const track = document.createElement("span");
+    track.className = "dash-month__track";
+    const bar = document.createElement("span");
+    bar.className = "dash-month__bar";
+    // los meses sin entrenamientos quedan con la barra vacía
+    bar.style.width = count ? `${Math.max((count / max) * 100, 4)}%` : "0";
+    track.appendChild(bar);
+
+    const value = document.createElement("span");
+    value.className = "dash-month__count";
+    value.textContent = count;
+
+    li.append(name, track, value);
+    list.appendChild(li);
+  });
+}
+
 function renderDashboard(workouts) {
   const wrapper     = document.querySelector(".dash-wrapper");
   const cards       = document.getElementById("dashCards");
+  const months      = document.getElementById("dashMonths");
   const historyList = document.getElementById("dashHistoryList");
   const msg         = document.getElementById("dashMessage");
 
@@ -1441,6 +1509,7 @@ function renderDashboard(workouts) {
 
   if (!workouts.length) {
     if (cards) cards.hidden = true;
+    if (months) months.hidden = true;
     if (historyList) historyList.replaceChildren();
     if (msg) {
       msg.textContent = "No workouts yet. Complete a Fibonacci session to start tracking!";
@@ -1450,13 +1519,19 @@ function renderDashboard(workouts) {
     return;
   }
 
-  if (cards) cards.hidden = false;
-  if (msg)  msg.hidden    = true;
+  if (cards)  cards.hidden  = false;
+  if (months) months.hidden = false;
+  if (msg)    msg.hidden    = true;
 
   const s = computeDashStats(workouts);
 
   setDashText("dashMonthCount",  s.thisMonthCount);
   setDashText("dashLastDays",    s.daysSinceLast === 0 ? "Today" : `${s.daysSinceLast}d ago`);
+  setDashText("dashAvgPerMonth", Number.isInteger(s.avgPerMonth)
+    ? s.avgPerMonth
+    : s.avgPerMonth.toFixed(1));
+
+  renderDashMonths(s.months);
 
   if (!historyList) return;
   historyList.replaceChildren();
@@ -1510,7 +1585,10 @@ function setDashLoadingState() {
   const wrapper = document.querySelector(".dash-wrapper");
   if (wrapper) wrapper.classList.add("dash-loading");
 
-  ["dashMonthCount", "dashLastDays"].forEach((id) => setDashText(id, "—"));
+  ["dashMonthCount", "dashLastDays", "dashAvgPerMonth"].forEach((id) => setDashText(id, "—"));
+
+  const monthsList = document.getElementById("dashMonthsList");
+  if (monthsList) monthsList.replaceChildren();
 
   // Skeleton placeholder cards in the history list
   const list = document.getElementById("dashHistoryList");
