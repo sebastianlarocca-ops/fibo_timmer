@@ -2455,10 +2455,25 @@ function initExercisesSearch() {
   input.addEventListener("input", refreshExercisesView);
 }
 
+/** Patrones tildados en el form de alta, en el orden canónico. */
+function readNewExercisePatrones() {
+  const wrap = document.getElementById("exAddPatrones");
+  if (!wrap) return [];
+  return [...wrap.querySelectorAll('.ex-patron-chip[aria-pressed="true"]')]
+    .map((b) => b.dataset.patron);
+}
+
+function clearNewExercisePatrones() {
+  document
+    .querySelectorAll('#exAddPatrones .ex-patron-chip[aria-pressed="true"]')
+    .forEach((b) => b.setAttribute("aria-pressed", "false"));
+}
+
 /**
- * Alta manual de un ejercicio: sólo nombre + modalidad. `lastPerformed` y
- * `daysPerformed` quedan vacíos hasta que el ejercicio aparezca en un
- * entrenamiento terminado — de eso se encarga POST /api/workouts.
+ * Alta manual de un ejercicio: nombre + modalidad, con patrones y link
+ * opcionales. `lastPerformed` y `daysPerformed` quedan vacíos hasta que el
+ * ejercicio aparezca en un entrenamiento terminado — de eso se encarga
+ * POST /api/workouts.
  */
 async function submitNewExercise(event) {
   event.preventDefault();
@@ -2472,6 +2487,7 @@ async function submitNewExercise(event) {
   const name = nameEl.value.trim();
   const modalidad = modEl.value;
   const link = linkEl ? linkEl.value.trim() : "";
+  const patrones = readNewExercisePatrones();
 
   if (!name) { showExToast("Escribí un nombre", true); nameEl.focus(); return; }
   if (!modalidad) { showExToast("Elegí una modalidad", true); modEl.focus(); return; }
@@ -2486,7 +2502,7 @@ async function submitNewExercise(event) {
     const res = await fetch(`${API_BASE_URL}/api/exercises`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, modalidad, link: link || null }),
+      body: JSON.stringify({ name, modalidad, link: link || null, patrones }),
     });
 
     if (res.status === 409) {
@@ -2502,8 +2518,13 @@ async function submitNewExercise(event) {
     nameEl.value = "";
     modEl.value = "";
     if (linkEl) linkEl.value = "";
+    clearNewExercisePatrones();
     refreshExercisesView();
-    showExToast(`${created.name} → ${EX_BLOCK_LABEL[created.modalidad]}`);
+
+    const pats = (created.patrones || []).map((p) => PATRON_LABELS[p] || p).join(" + ");
+    showExToast(
+      `${created.name} → ${EX_BLOCK_LABEL[created.modalidad]}${pats ? ` · ${pats}` : ""}`
+    );
     flashExerciseRow(created.name);
   } catch (err) {
     console.warn("[Exercises] create failed:", err.message);
@@ -2525,6 +2546,29 @@ function flashExerciseRow(name) {
 
 function initExerciseAddForm() {
   document.getElementById("exAddForm")?.addEventListener("submit", submitNewExercise);
+
+  // Chips de patrón: multi-selección. Un ejercicio puede no tener ninguno, tener
+  // uno, o tener varios si es complejo — por eso son toggles y no un <select>.
+  const wrap = document.getElementById("exAddPatrones");
+  if (!wrap) return;
+
+  wrap.replaceChildren();
+  PATRON_ORDER.forEach((patron) => {
+    const btn = document.createElement("button");
+    // type=button: si no, cada chip enviaría el form
+    btn.type = "button";
+    btn.className = "ex-patron-chip";
+    btn.dataset.patron = patron;
+    btn.setAttribute("aria-pressed", "false");
+    btn.textContent = PATRON_LABELS[patron];
+    wrap.appendChild(btn);
+  });
+
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".ex-patron-chip");
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", btn.getAttribute("aria-pressed") === "true" ? "false" : "true");
+  });
 }
 
 /** Chips de modalidad: uno por bloque + "All". Volver a tocar el activo lo limpia. */

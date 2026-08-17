@@ -319,6 +319,10 @@
             <option value="overload">Over</option>
           </select>
           <button type="submit" class="ex-add__btn" aria-label="Add exercise">+</button>
+          <!-- Los chips los pinta initExerciseAddForm() desde PATRON_ORDER, para
+               que no se desincronicen del enum del backend. -->
+          <div id="exAddPatrones" class="ex-add__patrones" role="group"
+            aria-label="Movement patterns for the new exercise"></div>
           <input id="exAddLink" class="ex-add__link" type="url" maxlength="500"
             placeholder="Video link (optional)" aria-label="Video link for the new exercise" />
         </form>

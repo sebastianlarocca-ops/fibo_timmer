@@ -1437,6 +1437,39 @@ h1 {
   margin-bottom: 12px;
 }
 
+/* Patrones: fila propia de chips multi-selección, debajo de nombre + modalidad.
+   No es un <select> porque un ejercicio complejo lleva más de un patrón. */
+.ex-add__patrones {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 6px;
+}
+
+.ex-patron-chip {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--fg-mute);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.ex-patron-chip:hover { color: var(--fg); }
+.ex-patron-chip[aria-pressed="true"] {
+  background: rgba(255,106,44,0.14);
+  border-color: rgba(255,106,44,0.5);
+  color: var(--work);
+}
+
 /* El link va en su propia línea: en el celular no entra al lado del nombre. */
 .ex-add__link {
   flex: 1 0 100%;

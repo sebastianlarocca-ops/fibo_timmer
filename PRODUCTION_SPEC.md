@@ -794,14 +794,28 @@ El select vacío lleva `.ex-mod-select--empty` (color apagado).
 
 ### 12.5 Alta manual de ejercicios
 
-Formulario `#exAddForm` entre los chips y la tabla: nombre (texto, máx. 80) +
-`<select>` de modalidad + botón `+`. Al ser un `<form>`, Enter también envía.
+Formulario `#exAddForm` entre los chips y la tabla, en tres líneas:
+1. nombre (texto, máx. 80) + `<select>` de modalidad + botón `+`
+2. `#exAddPatrones` — cinco chips de patrón
+3. link de video (opcional, `type="url"`, máx. 500)
 
-`submitNewExercise()` valida en el cliente (nombre no vacío, modalidad elegida) y
-hace `POST /api/exercises`. Con la respuesta: mete el ejercicio en `_allExercises`,
-lo suma al cache del autocompletado, limpia el formulario, re-renderiza, avisa por
-toast y trae la fila nueva a la vista destellando — que si no, con el orden por
-`lastPerformed` queda al fondo de la lista, invisible.
+Al ser un `<form>`, Enter también envía.
+
+**Chips de patrón.** `initExerciseAddForm()` los pinta desde `PATRON_ORDER` /
+`PATRON_LABELS` en vez de hardcodearlos en el HTML, para que no se desincronicen del
+enum del backend. Son **multi-selección** (`aria-pressed` como estado, `.ex-patron-chip`)
+y no un `<select>`: un ejercicio complejo lleva más de un patrón, y ninguno es un
+estado válido. Van con `type="button"` — si no, cada tap enviaría el formulario.
+`readNewExercisePatrones()` los lee en el orden canónico y
+`clearNewExercisePatrones()` los apaga después de un alta exitosa.
+
+`submitNewExercise()` valida en el cliente (nombre no vacío, modalidad elegida, link
+bien formado) y hace `POST /api/exercises` con `{ name, modalidad, link, patrones }`.
+Los patrones son **opcionales**: sin ninguno tildado va `[]`, que es "sin clasificar".
+Con la respuesta: mete el ejercicio en `_allExercises`, lo suma al cache del
+autocompletado, limpia el formulario, re-renderiza, avisa por toast
+(`"<nombre> → BODYWEIGHT · Push + Knee"`) y trae la fila nueva a la vista destellando
+— que si no, con el orden por `lastPerformed` queda al fondo de la lista, invisible.
 
 | Caso | Aviso |
 |---|---|
