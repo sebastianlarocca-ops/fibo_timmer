@@ -291,6 +291,25 @@
           <h1 class="ex-title">Exercises</h1>
           <span class="ex-count" id="exCount"></span>
         </div>
+        <!-- Primero el alta, después los filtros: los filtros son de la tabla que
+             sigue, así que van pegados a ella y no partidos por el formulario. -->
+        <form id="exAddForm" class="ex-add" autocomplete="off">
+          <input id="exAddName" class="ex-add__name" type="text" maxlength="80"
+            placeholder="New exercise…" aria-label="New exercise name" />
+          <select id="exAddModalidad" class="ex-add__mod" aria-label="Modality for the new exercise">
+            <option value="">—</option>
+            <option value="core">Core</option>
+            <option value="bodyweight">Body</option>
+            <option value="overload">Over</option>
+          </select>
+          <button type="submit" class="ex-add__btn" aria-label="Add exercise">+</button>
+          <!-- Los chips los pinta initExerciseAddForm() desde PATRON_ORDER, para
+               que no se desincronicen del enum del backend. -->
+          <div id="exAddPatrones" class="ex-add__patrones" role="group"
+            aria-label="Movement patterns for the new exercise"></div>
+          <input id="exAddLink" class="ex-add__link" type="url" maxlength="500"
+            placeholder="Video link (optional)" aria-label="Video link for the new exercise" />
+        </form>
         <div class="ex-search-wrap">
           <input id="exSearch" type="search" class="ex-search"
             placeholder="Filter exercises…" autocomplete="off" aria-label="Filter exercises" />
@@ -312,23 +331,6 @@
         <!-- Los chips los pinta initExercisesPatronFilter() desde PATRON_ORDER. -->
         <div id="exPatronFilters" class="ex-filters ex-filters--patron" role="group"
           aria-label="Filter by movement pattern"></div>
-        <form id="exAddForm" class="ex-add" autocomplete="off">
-          <input id="exAddName" class="ex-add__name" type="text" maxlength="80"
-            placeholder="New exercise…" aria-label="New exercise name" />
-          <select id="exAddModalidad" class="ex-add__mod" aria-label="Modality for the new exercise">
-            <option value="">—</option>
-            <option value="core">Core</option>
-            <option value="bodyweight">Body</option>
-            <option value="overload">Over</option>
-          </select>
-          <button type="submit" class="ex-add__btn" aria-label="Add exercise">+</button>
-          <!-- Los chips los pinta initExerciseAddForm() desde PATRON_ORDER, para
-               que no se desincronicen del enum del backend. -->
-          <div id="exAddPatrones" class="ex-add__patrones" role="group"
-            aria-label="Movement patterns for the new exercise"></div>
-          <input id="exAddLink" class="ex-add__link" type="url" maxlength="500"
-            placeholder="Video link (optional)" aria-label="Video link for the new exercise" />
-        </form>
         <div id="exList" class="ex-list" aria-live="polite"></div>
         <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
         <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>

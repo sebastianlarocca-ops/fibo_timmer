@@ -1373,7 +1373,9 @@ h1 {
   color: var(--fg-mute);
 }
 
-.ex-search-wrap { margin-bottom: 1.1rem; }
+/* Pegado a sus chips: buscador + las dos filas de filtros son un solo grupo,
+   el de "buscar en la tabla". El aire va arriba, contra el form de alta. */
+.ex-search-wrap { margin-bottom: 8px; }
 
 .ex-search {
   width: 100%;
@@ -1443,7 +1445,8 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 12px;
+  /* Corta contra el grupo de filtros que sigue: son dos tareas distintas. */
+  margin-bottom: 1.35rem;
 }
 
 /* Patrones: fila propia de chips multi-selección, debajo de nombre + modalidad.
