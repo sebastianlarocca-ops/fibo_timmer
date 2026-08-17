@@ -1995,15 +1995,43 @@ let _allExercises = [];
 let _exSortKey = "lastPerformed";
 let _exSortDir = "desc";
 let _exModalidadFilter = ""; // "" = todas
+let _exPatronFilter = "";    // "" = todos
 
-/** Lo que se ve: cruce del buscador por nombre con el filtro de modalidad. */
-function visibleExercises() {
-  const q = document.getElementById("exSearch")?.value.trim().toLowerCase() || "";
-  return _allExercises.filter(
-    (e) =>
-      (!q || e.name.includes(q)) &&
-      (!_exModalidadFilter || e.modalidad === _exModalidadFilter)
+/**
+ * Un ejercicio pasa los filtros. Los tres se cruzan con AND.
+ * `patron` matchea si el ejercicio **incluye** ese patrón: un complejo aparece
+ * bajo los dos.
+ */
+function exerciseMatches(e, { q, modalidad, patron }) {
+  return (
+    (!q || e.name.includes(q)) &&
+    (!modalidad || e.modalidad === modalidad) &&
+    (!patron || (e.patrones || []).includes(patron))
   );
+}
+
+function currentExFilters() {
+  return {
+    q: document.getElementById("exSearch")?.value.trim().toLowerCase() || "",
+    modalidad: _exModalidadFilter,
+    patron: _exPatronFilter,
+  };
+}
+
+/** Lo que se ve: cruce del buscador con los filtros de modalidad y patrón. */
+function visibleExercises() {
+  const f = currentExFilters();
+  return _allExercises.filter((e) => exerciseMatches(e, f));
+}
+
+/**
+ * Cuántos ejercicios quedarían si se tocara ese chip, con los otros filtros
+ * como están. Así el contador responde "si toco esto, cuántos veo" en vez de un
+ * total absoluto que miente cuando hay otro filtro activo.
+ */
+function countExercisesWith(overrides) {
+  const f = { ...currentExFilters(), ...overrides };
+  return _allExercises.filter((e) => exerciseMatches(e, f)).length;
 }
 
 function refreshExercisesView() {
@@ -2429,6 +2457,7 @@ async function loadExercises() {
   if (msg) msg.hidden = true;
   if (search) search.value = "";
   _exModalidadFilter = ""; // arranca en "todas", igual que el buscador
+  _exPatronFilter = "";
 
   setExercisesLoadingState();
 
@@ -2584,22 +2613,60 @@ function initExercisesModalidadFilter() {
   });
 }
 
-/** Marca el chip activo y actualiza el contador de cada uno. */
-function updateExerciseFilterChips() {
-  const wrap = document.getElementById("exFilters");
+/**
+ * Chips de patrón: uno por patrón + "All". Selección única (no multi como en el
+ * form de alta): acá el objetivo es aislar un patrón para programar sobre él.
+ * Volver a tocar el activo lo limpia.
+ * Se pintan desde PATRON_ORDER para no desincronizarse del enum del backend.
+ */
+function initExercisesPatronFilter() {
+  const wrap = document.getElementById("exPatronFilters");
   if (!wrap) return;
-  wrap.querySelectorAll(".ex-filter").forEach((btn) => {
+
+  wrap.replaceChildren();
+  [{ value: "", label: "All" }, ...PATRON_ORDER.map((p) => ({ value: p, label: PATRON_LABELS[p] }))]
+    .forEach(({ value, label }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ex-filter";
+      btn.dataset.patron = value;
+      btn.setAttribute("aria-pressed", String(value === _exPatronFilter));
+      btn.append(label + " ");
+      const count = document.createElement("span");
+      count.className = "ex-filter__count";
+      btn.appendChild(count);
+      wrap.appendChild(btn);
+    });
+
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".ex-filter");
+    if (!btn) return;
+    const value = btn.dataset.patron || "";
+    _exPatronFilter = value && value === _exPatronFilter ? "" : value;
+    refreshExercisesView();
+  });
+}
+
+/** Marca los chips activos de las dos filas y actualiza los contadores. */
+function updateExerciseFilterChips() {
+  document.querySelectorAll("#exFilters .ex-filter").forEach((btn) => {
     const value = btn.dataset.modalidad || "";
     const activo = value === _exModalidadFilter;
     btn.classList.toggle("ex-filter--active", activo);
     btn.setAttribute("aria-pressed", String(activo));
 
     const countEl = btn.querySelector(".ex-filter__count");
-    if (countEl) {
-      countEl.textContent = value
-        ? _allExercises.filter((x) => x.modalidad === value).length
-        : _allExercises.length;
-    }
+    if (countEl) countEl.textContent = countExercisesWith({ modalidad: value });
+  });
+
+  document.querySelectorAll("#exPatronFilters .ex-filter").forEach((btn) => {
+    const value = btn.dataset.patron || "";
+    const activo = value === _exPatronFilter;
+    btn.classList.toggle("ex-filter--active", activo);
+    btn.setAttribute("aria-pressed", String(activo));
+
+    const countEl = btn.querySelector(".ex-filter__count");
+    if (countEl) countEl.textContent = countExercisesWith({ patron: value });
   });
 }
 
@@ -2884,6 +2951,7 @@ function bootstrap() {
   initNavigation();
   initExercisesSearch();
   initExercisesModalidadFilter();
+  initExercisesPatronFilter();
   initExerciseAddForm();
 
   // 2. Primer render

@@ -775,11 +775,39 @@ Indicadores: `↕` inactiva, `↑`/`↓` activa; la `<th>` activa lleva `.ex-th-
 El estado de orden (`_exSortKey`, `_exSortDir`) **sobrevive** al filtrado y a cambios de pestaña,
 pero no a un reload.
 
-### 12.3 Buscador
+### 12.3 Filtros — buscador + modalidad + patrón
 
-`#exSearch`, filtrado **client-side** en cada `input`: `name.includes(query.toLowerCase())`.
-Contador `#exCount` = `"N total"` (siempre el total sin filtrar).
-Sin resultados pero con datos cargados → `"No exercises match your search."` y el contador se vacía.
+Tres filtros que se cruzan con **AND**, todo client-side sobre `_allExercises`:
+
+| Filtro | Control | Estado | Criterio |
+|---|---|---|---|
+| Texto | `#exSearch` | el valor del input | `name.includes(q)` |
+| Modalidad | `#exFilters` | `_exModalidadFilter` | `modalidad === valor` |
+| Patrón | `#exPatronFilters` | `_exPatronFilter` | `patrones.includes(valor)` |
+
+`exerciseMatches(e, filtros)` es el único predicado; `visibleExercises()` lo aplica con los
+filtros actuales y `countExercisesWith(overrides)` con uno sobrescrito.
+
+Las dos filas de chips son de **selección única** (a diferencia de los chips del form de alta,
+que son multi): el objetivo acá es aislar un patrón para programar sobre él. Cada fila tiene su
+chip `All`, y volver a tocar el chip activo también lo limpia. La fila de patrones se pinta desde
+`PATRON_ORDER` / `PATRON_LABELS`, no desde el markup.
+
+**Un ejercicio complejo aparece bajo todos sus patrones**: `tire slam` sale tanto en `Pull` como
+en `Hip`. Por eso la suma de los contadores de la fila (58) es mayor que el total (53).
+
+**Los contadores son cruzados, no absolutos.** Cada chip muestra cuántos ejercicios quedarían si
+se lo tocara, respetando los otros filtros activos — responde "si toco esto, cuántos veo". Con
+`Over` activo, la fila de patrones cuenta sólo dentro de overload; con `Hip` activo, la fila de
+modalidad cuenta sólo los hip dominantes. Un total absoluto mentiría: mostraría `Body 20` cuando
+al tocarlo se ven 2.
+
+Contador `#exCount` = `"N of TOTAL"`.
+Sin resultados pero con datos cargados → `"No exercises match the current filters."` y el
+contador se vacía. `loadExercises()` resetea los tres filtros en cada entrada a la pestaña.
+
+> Ojo: `Core` aparece en las dos filas — es una modalidad (el bloque de 3 min) **y** un patrón de
+> movimiento. Son cosas distintas que coinciden en el nombre.
 
 ### 12.4 Clasificación manual de modalidad
 

@@ -1429,6 +1429,15 @@ h1 {
   font-size: 9px;
 }
 
+/* Fila de patrones: 6 chips contra los 4 de modalidad, así que respira menos.
+   Va pegada a la fila de arriba porque las dos filtran la misma tabla. */
+.ex-filters--patron { margin-top: -6px; }
+.ex-filters--patron .ex-filter {
+  padding: 8px 2px;
+  letter-spacing: 0.04em;
+}
+.ex-filters--patron .ex-filter__count { margin-left: 2px; }
+
 /* ── Alta manual de ejercicios ──────────────────────────────────── */
 .ex-add {
   display: flex;
