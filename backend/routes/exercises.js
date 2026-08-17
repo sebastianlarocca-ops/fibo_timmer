@@ -5,7 +5,31 @@ const Workout = require("../models/workout");
 const { computeExerciseStats } = require("../utils/exerciseStats");
 
 const MODALIDADES = ["core", "bodyweight", "overload"];
-const EX_FIELDS = "name lastPerformed daysPerformed modalidad link -_id";
+const PATRONES = Exercise.PATRONES;
+const EX_FIELDS = "name lastPerformed daysPerformed modalidad link patrones -_id";
+
+/**
+ * Normaliza el array de patrones que manda el cliente.
+ * Acepta `[]` / `null` como "sin clasificar"; deduplica y respeta el orden de
+ * llegada. Devuelve { ok: true, value } o { ok: false, error }.
+ */
+function normalizePatrones(raw) {
+  if (raw === null || raw === undefined) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "patrones must be an array." };
+  }
+
+  const value = [];
+  for (const item of raw) {
+    const p = String(item ?? "").trim().toLowerCase();
+    if (!p) continue;
+    if (!PATRONES.includes(p)) {
+      return { ok: false, error: `patron "${p}" is not one of: ${PATRONES.join(", ")}.` };
+    }
+    if (!value.includes(p)) value.push(p);
+  }
+  return { ok: true, value };
+}
 
 /**
  * Normaliza el link de video que manda el cliente.
@@ -64,6 +88,9 @@ router.post("/", async (req, res) => {
     const link = normalizeLink(req.body?.link);
     if (!link.ok) return res.status(400).json({ error: link.error });
 
+    const patrones = normalizePatrones(req.body?.patrones);
+    if (!patrones.ok) return res.status(400).json({ error: patrones.error });
+
     const existing = await Exercise.findOne({ name }).select(EX_FIELDS);
     if (existing) {
       return res.status(409).json({ error: "Exercise already exists.", exercise: existing });
@@ -73,6 +100,7 @@ router.post("/", async (req, res) => {
       name,
       modalidad,
       link: link.value,
+      patrones: patrones.value,
       daysPerformed: 0,
       lastPerformed: null,
     });
@@ -82,6 +110,7 @@ router.post("/", async (req, res) => {
       name: created.name,
       modalidad: created.modalidad,
       link: created.link,
+      patrones: created.patrones,
       daysPerformed: created.daysPerformed,
       lastPerformed: created.lastPerformed,
     });
@@ -95,9 +124,10 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PATCH /api/exercises/:name — clasificar la modalidad y/o cargar el link.
+// PATCH /api/exercises/:name — clasificar modalidad/patrones y/o cargar el link.
 // Sólo toca los campos que vengan en el body: un PATCH de link no pisa la
-// modalidad ya cargada, y viceversa.
+// modalidad ya cargada, y viceversa. `patrones` se reemplaza entero (no hace
+// merge): mandar `[]` es desclasificar.
 router.patch("/:name", async (req, res) => {
   try {
     const name = String(req.params.name || "").trim().toLowerCase();
@@ -128,8 +158,16 @@ router.patch("/:name", async (req, res) => {
       $set.link = link.value;
     }
 
+    if ("patrones" in body) {
+      const patrones = normalizePatrones(body.patrones);
+      if (!patrones.ok) return res.status(400).json({ error: patrones.error });
+      $set.patrones = patrones.value;
+    }
+
     if (!Object.keys($set).length) {
-      return res.status(400).json({ error: "Nothing to update: send modalidad and/or link." });
+      return res.status(400).json({
+        error: "Nothing to update: send modalidad, link and/or patrones.",
+      });
     }
 
     const updated = await Exercise.findOneAndUpdate(
@@ -142,7 +180,7 @@ router.patch("/:name", async (req, res) => {
 
     console.log(
       `[exercise patch] ${name} → ${Object.entries($set)
-        .map(([k, v]) => `${k}=${v ?? "null"}`)
+        .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join("+") || "[]" : v ?? "null"}`)
         .join(" ")}`
     );
     return res.json(updated);

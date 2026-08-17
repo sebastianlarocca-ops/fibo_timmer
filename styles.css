@@ -1146,6 +1146,124 @@ h1 {
   text-align: right;
 }
 
+/* Balance de patrones — últimos 30 días, un bloque por modalidad */
+.dash-patrones { margin-bottom: 1.75rem; }
+
+.dash-patrones__meta {
+  margin: -0.4rem 0 0.75rem;
+  font-family: var(--font-num);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+}
+
+.dash-patrones__blocks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.dash-patron-block {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r-lg);
+}
+
+.dash-patron-block__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 0.7rem;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.dash-patron-block__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-patron-block__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dash-patron {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 2.4rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dash-patron__label {
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.dash-patron__track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.dash-patron__bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  /* El bloque define el color; el ancho ya es el porcentaje. */
+  background: var(--patron-accent, var(--work));
+  opacity: 0.5;
+  transition: width 0.25s ease;
+}
+
+.dash-patron__pct {
+  font-family: var(--font-num);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg-mute);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* El patrón más programado del bloque: es la señal que se busca de un vistazo */
+.dash-patron--top .dash-patron__bar { opacity: 1; }
+.dash-patron--top .dash-patron__label,
+.dash-patron--top .dash-patron__pct { color: var(--fg); }
+
+/* Un 0% es tan accionable como el máximo: se marca en el color del bloque */
+.dash-patron--zero .dash-patron__pct { color: var(--patron-accent, var(--work)); }
+
+.dash-patron-block--bodyweight { --patron-accent: var(--work); }
+.dash-patron-block--overload   { --patron-accent: var(--rest); }
+
+.dash-patron-block__note {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-num);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+
+@media (min-width: 640px) {
+  .dash-patrones__blocks { grid-template-columns: 1fr 1fr; }
+}
+
 .dash-history__title {
   margin: 0 0 0.75rem;
   font-family: var(--font-num);

@@ -1408,27 +1408,49 @@ async function fetchAllWorkouts() {
   return Array.isArray(body) ? body : (body.workouts ?? []);
 }
 
+/**
+ * Mapa nombre → patrones[], para cruzar contra los ejercicios de cada workout.
+ * Devuelve `null` si falla: el dashboard sigue funcionando sin la sección de
+ * patrones en vez de romperse entero.
+ */
+async function fetchExercisePatrones() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/exercises`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const out = {};
+    data.forEach((e) => { out[e.name] = e.patrones || []; });
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 // ── Dashboard cache (localStorage) ──────────────────────────────────────────
 
 // v2: el cache viejo guardaba sólo 100 workouts — insuficiente para 6 meses
-const DASH_CACHE_KEY = "dashCache_v2";
+// v3: suma el mapa de patrones por ejercicio
+const DASH_CACHE_KEY = "dashCache_v3";
 const DASH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function readDashCache() {
   try {
     const raw = localStorage.getItem(DASH_CACHE_KEY);
     if (!raw) return null;
-    const { workouts, ts } = JSON.parse(raw);
+    const { workouts, patrones, ts } = JSON.parse(raw);
     if (!Array.isArray(workouts)) return null;
-    return { workouts, stale: Date.now() - ts > DASH_CACHE_TTL };
+    return { workouts, patrones: patrones ?? null, stale: Date.now() - ts > DASH_CACHE_TTL };
   } catch {
     return null;
   }
 }
 
-function writeDashCache(workouts) {
+function writeDashCache(workouts, patrones) {
   try {
-    localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({ workouts, ts: Date.now() }));
+    localStorage.setItem(
+      DASH_CACHE_KEY,
+      JSON.stringify({ workouts, patrones, ts: Date.now() })
+    );
   } catch { /* storage full / private mode */ }
 }
 
@@ -1454,6 +1476,110 @@ function computeDashStats(workouts) {
     byMonth,
     months,
     avgPerMonth:    total / months.length,
+  };
+}
+
+// ── Balance de patrones ──────────────────────────────────────────────────────
+
+// Orden fijo: las dos columnas (BD y OV) quedan alineadas fila a fila, así se
+// comparan de un vistazo. El patrón más pesado se resalta en vez de reordenarse.
+const PATRON_ORDER  = ["empuje", "traccion", "rodilla_dominante", "cadera_dominante", "core"];
+const PATRON_LABELS = {
+  empuje:            "Push",
+  traccion:          "Pull",
+  rodilla_dominante: "Knee",
+  cadera_dominante:  "Hip",
+  core:              "Core",
+};
+// Sólo BD y OV: el bloque de core es 100% patrón core por definición.
+const PATRON_BLOCKS = [
+  { key: "bodyweight", label: "Bodyweight" },
+  { key: "overload",   label: "Overload" },
+];
+const PATRON_WINDOW_DAYS = 30;
+
+/**
+ * Reparte 100 puntos enteros respetando las proporciones (método del mayor
+ * resto). Sin esto, redondear cada porcentaje por separado da sumas de 99 o 101
+ * y el reparto deja de leerse como un 100% exacto.
+ */
+function sharesToPercent(weights, total) {
+  if (!total) return weights.map(() => 0);
+
+  const exact  = weights.map((w) => (w / total) * 100);
+  const out    = exact.map(Math.floor);
+  let leftover = 100 - out.reduce((a, b) => a + b, 0);
+
+  exact
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac)
+    .forEach(({ i }) => {
+      if (leftover > 0) { out[i]++; leftover--; }
+    });
+
+  return out;
+}
+
+/**
+ * Reparto de patrones por bloque en los últimos 30 días.
+ * Cada ejercicio vale 1 y lo reparte en partes iguales entre sus patrones: un
+ * burpee suma 0,5 a `empuje` y 0,5 a `rodilla_dominante`. Así los porcentajes
+ * de cada bloque suman 100% y se leen como fracción del volumen programado.
+ */
+function computePatronBalance(workouts, patronesByName) {
+  if (!patronesByName) return null;
+
+  const since  = Date.now() - PATRON_WINDOW_DAYS * 86_400_000;
+  const recent = workouts.filter((w) => new Date(w.date).getTime() >= since);
+
+  const blocks = PATRON_BLOCKS.map(({ key, label }) => {
+    const weights = {};
+    PATRON_ORDER.forEach((p) => (weights[p] = 0));
+    let total = 0;
+    let unclassified = 0;
+
+    recent.forEach((w) => {
+      (w[key] || []).forEach((raw) => {
+        // Los workouts guardan el nombre tal como se tipeó; `exercises` lo
+        // normaliza a minúsculas — sin esto el cruce falla en la mitad de los casos.
+        const patrones = patronesByName[String(raw).trim().toLowerCase()];
+        if (!patrones || !patrones.length) { unclassified++; return; }
+
+        const share = 1 / patrones.length;
+        patrones.forEach((p) => {
+          if (!(p in weights)) return; // patrón que el backend agregó y este front no conoce
+          weights[p] += share;
+          total += share;
+        });
+      });
+    });
+
+    const pcts = sharesToPercent(PATRON_ORDER.map((p) => weights[p]), total);
+    const rows = PATRON_ORDER.map((p, i) => ({
+      patron: p,
+      label:  PATRON_LABELS[p],
+      weight: weights[p],
+      pct:    pcts[i],
+    }));
+
+    const topWeight = Math.max(...rows.map((r) => r.weight));
+
+    return {
+      key,
+      label,
+      rows,
+      total,
+      unclassified,
+      // Sin datos no hay nada que resaltar; con empate se resaltan los dos.
+      topWeight: total ? topWeight : -1,
+    };
+  });
+
+  return {
+    days:         PATRON_WINDOW_DAYS,
+    workoutCount: recent.length,
+    blocks,
+    hasData:      blocks.some((b) => b.total > 0),
   };
 }
 
@@ -1497,12 +1623,94 @@ function renderDashMonths(months) {
   });
 }
 
-function renderDashboard(workouts) {
+/** Reparto de patrones por bloque, una lista de barras por bloque. */
+function renderPatronBalance(balance) {
+  const section = document.getElementById("dashPatrones");
+  const holder  = document.getElementById("dashPatronesBlocks");
+  const meta    = document.getElementById("dashPatronesMeta");
+  if (!section || !holder) return;
+
+  // Sin ejercicios clasificados en la ventana no hay nada que mostrar: la
+  // sección se esconde entera en vez de dibujar cinco barras en cero.
+  if (!balance || !balance.hasData) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  if (meta) {
+    const n = balance.workoutCount;
+    meta.textContent = `${n} workout${n === 1 ? "" : "s"} · share of programmed volume`;
+  }
+
+  holder.replaceChildren();
+
+  balance.blocks.forEach((block) => {
+    const wrap = document.createElement("div");
+    wrap.className = `dash-patron-block dash-patron-block--${block.key}`;
+
+    const head = document.createElement("h3");
+    head.className = "dash-patron-block__title";
+    head.textContent = block.label;
+
+    const count = document.createElement("span");
+    count.className = "dash-patron-block__count";
+    count.textContent = block.total
+      ? `${Number.isInteger(block.total) ? block.total : block.total.toFixed(1)} ex`
+      : "—";
+    head.appendChild(count);
+
+    const list = document.createElement("ul");
+    list.className = "dash-patron-block__list";
+
+    block.rows.forEach((row) => {
+      const li = document.createElement("li");
+      li.className = "dash-patron";
+      if (row.weight === block.topWeight) li.classList.add("dash-patron--top");
+      if (row.weight === 0) li.classList.add("dash-patron--zero");
+
+      const label = document.createElement("span");
+      label.className = "dash-patron__label";
+      label.textContent = row.label;
+
+      const track = document.createElement("span");
+      track.className = "dash-patron__track";
+      const bar = document.createElement("span");
+      bar.className = "dash-patron__bar";
+      // El track es el 100%: el ancho ES el porcentaje, no una escala relativa.
+      bar.style.width = `${row.pct}%`;
+      track.appendChild(bar);
+
+      const pct = document.createElement("span");
+      pct.className = "dash-patron__pct";
+      pct.textContent = `${row.pct}%`;
+
+      li.append(label, track, pct);
+      list.appendChild(li);
+    });
+
+    wrap.append(head, list);
+
+    // Un ejercicio sin patrones cargados no entra en el reparto: avisarlo, si no
+    // los porcentajes mienten en silencio.
+    if (block.unclassified) {
+      const note = document.createElement("p");
+      note.className = "dash-patron-block__note";
+      note.textContent = `${block.unclassified} sin clasificar (fuera del cálculo)`;
+      wrap.appendChild(note);
+    }
+
+    holder.appendChild(wrap);
+  });
+}
+
+function renderDashboard(workouts, patronesByName) {
   const wrapper     = document.querySelector(".dash-wrapper");
   const cards       = document.getElementById("dashCards");
   const months      = document.getElementById("dashMonths");
   const historyList = document.getElementById("dashHistoryList");
   const msg         = document.getElementById("dashMessage");
+  const patrones    = document.getElementById("dashPatrones");
 
   // Remove loading state
   if (wrapper) wrapper.classList.remove("dash-loading");
@@ -1510,6 +1718,7 @@ function renderDashboard(workouts) {
   if (!workouts.length) {
     if (cards) cards.hidden = true;
     if (months) months.hidden = true;
+    if (patrones) patrones.hidden = true;
     if (historyList) historyList.replaceChildren();
     if (msg) {
       msg.textContent = "No workouts yet. Complete a Fibonacci session to start tracking!";
@@ -1532,6 +1741,7 @@ function renderDashboard(workouts) {
     : s.avgPerMonth.toFixed(1));
 
   renderDashMonths(s.months);
+  renderPatronBalance(computePatronBalance(workouts, patronesByName));
 
   if (!historyList) return;
   historyList.replaceChildren();
@@ -1590,6 +1800,9 @@ function setDashLoadingState() {
   const monthsList = document.getElementById("dashMonthsList");
   if (monthsList) monthsList.replaceChildren();
 
+  const patrones = document.getElementById("dashPatrones");
+  if (patrones) patrones.hidden = true;
+
   // Skeleton placeholder cards in the history list
   const list = document.getElementById("dashHistoryList");
   if (list) {
@@ -1612,7 +1825,7 @@ async function loadDashboard() {
 
   if (cached) {
     // Show cached data instantly — no loading state shown to the user
-    renderDashboard(cached.workouts);
+    renderDashboard(cached.workouts, cached.patrones);
     if (!cached.stale) return; // cache is fresh — skip network trip
     // Stale cache: data is already visible, refresh silently in background
   } else {
@@ -1621,9 +1834,14 @@ async function loadDashboard() {
   }
 
   try {
-    const workouts = await fetchAllWorkouts();
-    writeDashCache(workouts);
-    renderDashboard(workouts);
+    // Los patrones van en paralelo y nunca tiran error: si el fetch falla el
+    // dashboard se dibuja igual, sólo sin la sección de balance.
+    const [workouts, patrones] = await Promise.all([
+      fetchAllWorkouts(),
+      fetchExercisePatrones(),
+    ]);
+    writeDashCache(workouts, patrones);
+    renderDashboard(workouts, patrones);
   } catch (err) {
     console.warn("[Dashboard] fetch failed:", err.message);
     if (cached) return; // cached data is still showing — no need to show an error

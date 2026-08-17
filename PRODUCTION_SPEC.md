@@ -105,12 +105,30 @@ La normalización a minúsculas ocurre sólo al derivar `exercises`.
 | `lastPerformed` | Date | `null` por default |
 | `daysPerformed` | Number | Cantidad de **días calendario distintos** en que se hizo, no cantidad de sesiones |
 | `modalidad` | String | `"core"` \| `"bodyweight"` \| `"overload"` \| `null` (default). Bloque en el que se cargó el ejercicio la última vez |
+| `link` | String | URL `http`/`https` a un video de referencia. `null` (default) = sin video |
+| `patrones` | [String] | Patrones de movimiento. `[]` (default) = sin clasificar |
 | `createdAt` / `updatedAt` | Date | `timestamps: true` |
 
 Se recalcula por upsert en cada `POST /api/workouts`.
 `modalidad` se deriva del bloque en el que vino el ejercicio en ese workout; si aparece en más de
 un bloque en la misma sesión gana el primero (`core` → `bodyweight` → `overload`). Un workout
 posterior **pisa** la modalidad anterior. También se puede fijar a mano vía `PATCH /api/exercises/:name`.
+
+**Patrones de movimiento.** Enum de 5 valores, definido en `backend/models/exercise.js` y exportado
+como `Exercise.PATRONES`:
+
+| Patrón | Criterio |
+|---|---|
+| `empuje` | El peso se aleja del cuerpo |
+| `traccion` | El peso se acerca al cuerpo |
+| `rodilla_dominante` | Sentadilla o zancada, motor cuádriceps |
+| `cadera_dominante` | Bisagra de cadera, motor glúteo e isquios |
+| `core` | Estabilización o flexión del tronco |
+
+Es un **array**, no un valor único: `[]` es sin clasificar, un elemento es un ejercicio simple y dos
+o más es un ejercicio complejo. No hay flag `es_complejo` — lo dice el largo del array.
+A diferencia de `modalidad`, **ningún workout lo toca**: se carga a mano vía `PATCH` o en lote con
+`backend/scripts/import-patrones.js`.
 
 ### 3.3 `currentworkouts` — plan de ejercicios de la sesión en curso
 
@@ -167,28 +185,47 @@ Devuelve un workout o `404 { error: "Workout not found." }`. **No se usa desde e
 
 ### `GET /api/exercises`
 Orden: `lastPerformed: -1`, luego `name: 1`.
-Proyección `name lastPerformed daysPerformed modalidad -_id` → **no devuelve `_id`**.
+Proyección `name lastPerformed daysPerformed modalidad link patrones -_id` → **no devuelve `_id`**.
 ```json
-[ { "name": "sit ups", "daysPerformed": 11, "lastPerformed": "2026-07-25T14:49:06.898Z", "modalidad": "core" } ]
+[ { "name": "sit ups", "daysPerformed": 11, "lastPerformed": "2026-07-25T14:49:06.898Z",
+    "modalidad": "core", "link": null, "patrones": ["core"] } ]
 ```
 
 ### `POST /api/exercises`
-Alta manual. Body: `{ "name": "...", "modalidad": "core" | "bodyweight" | "overload" }`.
-Ambos obligatorios; el nombre se normaliza (trim + minúsculas).
+Alta manual. Body: `{ "name": "...", "modalidad": "core" | "bodyweight" | "overload",
+"link": "https://..." (opcional), "patrones": ["core", ...] (opcional) }`.
+`name` y `modalidad` son obligatorios; el nombre se normaliza (trim + minúsculas).
 `daysPerformed` arranca en `0` y `lastPerformed` en `null` — los completa
 `POST /api/workouts` recién cuando el ejercicio aparece en un entrenamiento terminado.
-- `400` si falta el nombre o la modalidad no es válida.
+- `400` si falta el nombre, la modalidad no es válida, el link no es `http`/`https` o algún patrón
+  cae fuera del enum.
 - `409 { error, exercise }` si ya existe (también ante colisión del índice único).
 - `201` con el ejercicio creado.
 
 ### `PATCH /api/exercises/:name`
-Clasifica manualmente la modalidad de un ejercicio ya existente. `:name` va URL-encodeado y se
-normaliza a minúsculas. Body: `{ "modalidad": "core" | "bodyweight" | "overload" | null }`.
-- `400` si la modalidad no es una de esas.
+Clasifica manualmente un ejercicio ya existente. `:name` va URL-encodeado y se normaliza a
+minúsculas. Body: cualquier combinación de `modalidad`, `link` y `patrones` — **sólo se tocan los
+campos presentes**, así que un PATCH de link no pisa la modalidad ni los patrones.
+- `patrones` se **reemplaza entero**, no hace merge: mandar `[]` es desclasificar. Se deduplica y se
+  normaliza a minúsculas conservando el orden de llegada.
+- `400` si la modalidad no es válida, el link no es `http`/`https`, `patrones` no es un array, algún
+  patrón cae fuera del enum, o el body no trae ninguno de los tres campos.
 - `404 { error: "Exercise not found." }` si el nombre no existe (**no crea ejercicios**).
 - `200` con el doc actualizado.
 
 Lo llama la pestaña List en cada cambio del `<select>` de modalidad.
+
+### `backend/scripts/import-patrones.js` — carga en lote (no es un endpoint)
+Importa la clasificación de patrones desde la planilla. Una fila por par (ejercicio, patrón): los
+ejercicios complejos aparecen repetidos y se colapsan en un array. La columna `es_complejo` de la
+planilla se ignora por redundante.
+```bash
+node scripts/import-patrones.js ../patrones.csv --dry-run   # muestra el plan, no escribe
+node scripts/import-patrones.js ../patrones.csv
+```
+Aborta antes de conectarse si algún patrón cae fuera del enum. **No crea ejercicios**: los nombres de
+la planilla que no estén en la base se reportan y se saltean. Los que están en la base y no en la
+planilla quedan en `[]`.
 
 ### `POST /api/exercises/backfill`
 Reconstruye toda la colección `exercises` desde los `workouts` existentes. Idempotente (upsert).
@@ -541,7 +578,7 @@ Payload:
 { "date": "<ISO now>", "core": [...], "bodyweight": [...], "overload": [...], "durationSec": 1380 }
 ```
 
-- **Éxito:** log `[API] Workout saved to MongoDB — id: …`, borra `dashCache_v1` de localStorage,
+- **Éxito:** log `[API] Workout saved to MongoDB — id: …`, borra `dashCache_v3` de localStorage,
   y dispara `DELETE /api/current-workout/all` (fire-and-forget).
 - **Respuesta no-OK:** log de warning y **encola el payload** en `pendingWorkouts_v1`.
 - **Excepción de red:** log de warning y encola igual.
@@ -620,20 +657,22 @@ Si está corriendo o completo, ignora el cambio.
 
 Estrategia **cache-first + revalidación en background**:
 
-1. Lee `dashCache_v1` de localStorage → `{ workouts, ts }`
+1. Lee `dashCache_v3` de localStorage → `{ workouts, patrones, ts }`
 2. Hay cache → renderiza **al instante**, sin skeleton
    - cache fresco (`< 5 min`) → **corta, no toca la red**
    - cache stale → sigue y refresca en silencio
 3. No hay cache → muestra skeleton (`.dash-loading` + 3 `<li class="dash-skeleton-item">`)
-4. `GET /api/workouts?limit=100`, escribe cache, renderiza
+4. `GET /api/workouts?limit=400` + `GET /api/exercises` **en paralelo**, escribe cache, renderiza
 5. Fallo de red **con** cache → no muestra error (los datos viejos siguen en pantalla)
 6. Fallo de red **sin** cache → `"Could not load data — server may be offline."`
    con clase `.dash-message--error`
 
 `fetchAllWorkouts()` acepta las dos formas de respuesta: array pelado o `{ workouts: [...] }`.
 El backend hoy devuelve la segunda.
+`fetchExercisePatrones()` **nunca tira error**: devuelve `null` si falla, y el dashboard se dibuja
+igual pero sin la sección de balance de patrones.
 
-**Constantes:** `DASH_CACHE_KEY = "dashCache_v1"`, `DASH_CACHE_TTL = 5 * 60 * 1000`.
+**Constantes:** `DASH_CACHE_KEY = "dashCache_v3"`, `DASH_CACHE_TTL = 5 * 60 * 1000`.
 El cache se invalida al guardar un workout con éxito y al vaciar la cola de pendientes.
 
 ### 11.2 Estadísticas — `computeDashStats(workouts)`
@@ -651,7 +690,44 @@ Devuelve `{ firstDate, lastDate, daysSinceLast, thisMonthCount, streak, byMonth 
 `calcStreak()` está implementado y funciona (días consecutivos terminando hoy o ayer);
 es una feature lista para exponer, hoy invisible.
 
-### 11.3 Historial
+### 11.3 Balance de patrones — `computePatronBalance(workouts, patronesByName)`
+
+Responde "¿qué fracción de lo que programé en cada bloque fue a cada patrón?", para detectar
+desbalances y corregirlos en la programación siguiente.
+
+**Ventana:** últimos **30 días** (`PATRON_WINDOW_DAYS`), por `w.date`.
+**Bloques:** sólo `bodyweight` y `overload`. El bloque `core` se omite a propósito — es 100% patrón
+`core` por definición, no informa nada.
+
+**Ponderación.** Cada ejercicio de la sesión vale **1** y lo reparte en partes iguales entre sus
+patrones: un burpee (`empuje` + `rodilla_dominante`) suma 0,5 a cada uno. Así los porcentajes de
+cada bloque suman 100% y se leen como fracción del volumen programado, no como presencia.
+
+**Cruce de nombres.** Los workouts guardan el nombre **tal como se tipeó** y `exercises` lo guarda
+en minúsculas: el join va por `String(raw).trim().toLowerCase()`. Sin eso falla en cualquier
+ejercicio cargado con mayúsculas.
+
+**Redondeo.** `sharesToPercent()` reparte 100 puntos enteros por el método del mayor resto.
+Redondear cada porcentaje por separado daría sumas de 99 o 101.
+
+**Fuera del cálculo.** Un ejercicio con `patrones: []` no entra en el reparto y se cuenta aparte;
+si hay alguno, el bloque muestra `"N sin clasificar (fuera del cálculo)"`. Sin esa nota los
+porcentajes mentirían en silencio.
+
+**Render — `renderPatronBalance(balance)`.** La sección `#dashPatrones` se **oculta entera** si el
+fetch de ejercicios falló, si no hay workouts en la ventana, o si nada quedó clasificado.
+Dos cards (`.dash-patron-block--bodyweight` naranja, `--overload` verde), cada una con las 5 filas
+en **orden fijo** (`empuje`, `traccion`, `rodilla_dominante`, `cadera_dominante`, `core`) — así las
+dos columnas se comparan fila a fila. Etiquetas cortas: `Push` / `Pull` / `Knee` / `Hip` / `Core`.
+
+- El track es el 100%: el **ancho de la barra ES el porcentaje**, no una escala relativa al máximo
+  (a diferencia de `.dash-month__bar`).
+- `.dash-patron--top` (puede haber empate) resalta el patrón más programado: barra a opacidad plena
+  y texto en `--fg`.
+- `.dash-patron--zero` pinta el `0%` en el color del bloque — un patrón ausente es tan accionable
+  como el dominante.
+
+### 11.4 Historial
 
 `groupByDay(workouts)` agrupa por `YYYY-MM-DD` **en hora local** y **concatena** los ejercicios
 si hubo más de un workout el mismo día. Orden: descendente por día.
@@ -901,7 +977,7 @@ por día.
 ### Claves de localStorage
 `fibWorkoutExerciseListCore`, `fibWorkoutExerciseListBodyweight`, `fibWorkoutExerciseListOverload`,
 `fibWorkoutExerciseCore` / `Bodyweight` / `Overload` (legacy),
-`dashCache_v1`, `pendingWorkouts_v1`
+`dashCache_v3`, `pendingWorkouts_v1`
 
 ### Constantes de JS
 `FIB_SEQUENCE`, `FIB_TOTAL_SEC` (1380), `FIB_TOTAL_BLOCKS` (5), `FIB_BLOCK_TYPES`,
