@@ -4,13 +4,68 @@ const Workout = require("../models/workout");
 const Exercise = require("../models/exercise");
 const { computeExerciseStats } = require("../utils/exerciseStats");
 
+const PERF_BLOCKS = ["bodyweight", "overload"];
+
+/**
+ * Convierte un valor del formulario en número o null. Vacío/basura → null
+ * (nunca 0: "no cargué el dato" y "hice 0 reps" no son lo mismo).
+ */
+function toNumberOrNull(value, { max, decimals = 0 }) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const clamped = Math.min(Math.max(n, 0), max);
+  const factor = 10 ** decimals;
+  return Math.round(clamped * factor) / factor;
+}
+
+/**
+ * Normaliza el `performance` que manda el cliente. Devuelve undefined cuando no
+ * hay nada que guardar (skip, o formulario enviado en blanco), de modo que el
+ * documento quede sin el campo en vez de con un objeto vacío.
+ */
+function sanitizePerformance(raw) {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const rounds = {
+    bodyweight: toNumberOrNull(raw.rounds?.bodyweight, { max: 99 }),
+    overload: toNumberOrNull(raw.rounds?.overload, { max: 99 }),
+  };
+
+  const entries = (Array.isArray(raw.entries) ? raw.entries : [])
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const block = String(entry.block || "");
+      const name = String(entry.name || "").trim();
+      if (!PERF_BLOCKS.includes(block) || !name) return null;
+
+      return {
+        block,
+        name,
+        reps: toNumberOrNull(entry.reps, { max: 999 }),
+        // El peso sólo tiene sentido en overload; en bodyweight se descarta.
+        weightKg:
+          block === "overload"
+            ? toNumberOrNull(entry.weightKg, { max: 999, decimals: 1 })
+            : null,
+      };
+    })
+    // Una fila sin ningún dato cargado no aporta nada: se descarta.
+    .filter((entry) => entry && (entry.reps !== null || entry.weightKg !== null));
+
+  const hasRounds = rounds.bodyweight !== null || rounds.overload !== null;
+  if (!entries.length && !hasRounds) return undefined;
+
+  return { rounds, entries };
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/workouts
 // Save a completed Fibonacci workout session.
 // ---------------------------------------------------------------------------
 router.post("/", async (req, res) => {
   try {
-    const { date, core, bodyweight, overload, durationSec } = req.body;
+    const { date, core, bodyweight, overload, durationSec, performance } = req.body;
 
     // Basic structural validation
     if (
@@ -29,6 +84,7 @@ router.post("/", async (req, res) => {
       bodyweight: bodyweight.map(String),
       overload: overload.map(String),
       durationSec: typeof durationSec === "number" ? durationSec : null,
+      performance: sanitizePerformance(performance),
     });
 
     const saved = await workout.save();

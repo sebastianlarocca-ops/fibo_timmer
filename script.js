@@ -756,9 +756,7 @@ const fibonacciTimer = new WorkoutTimer({
   // so a network failure never breaks the in-browser experience.
   onCompleteBeep: () => {
     playFibCompleteSound();
-    saveCompletedWorkoutToAPI();
-    clearCurrentWorkoutCollection();
-    resetFibExercisePlan();
+    handleFibonacciComplete();
   },
 });
 
@@ -855,20 +853,12 @@ async function flushPendingWorkouts() {
 }
 
 /**
- * POST the current exercise lists + timestamp to /api/workouts.
- * Fires exactly once (via onCompleteBeep) when the Fibonacci timer finishes.
+ * POST a completed workout payload to /api/workouts.
+ * Lo dispara el formulario de carga (Guardar o Skip) al terminar el Fibonacci.
  * If the server is unreachable, the payload is queued in localStorage and
  * retried automatically on the next startup once the server is awake.
  */
-async function saveCompletedWorkoutToAPI() {
-  const payload = {
-    date: new Date().toISOString(),
-    core: [...fibExerciseLists.core],
-    bodyweight: [...fibExerciseLists.bodyweight],
-    overload: [...fibExerciseLists.overload],
-    durationSec: FIB_TOTAL_SEC,
-  };
-
+async function saveCompletedWorkoutToAPI(payload) {
   try {
     const res = await fetch(`${API_BASE_URL}/api/workouts`, {
       method: "POST",
@@ -891,6 +881,285 @@ async function saveCompletedWorkoutToAPI() {
     console.warn("[API] Could not reach workout server — queued for retry:", err.message);
     enqueuePendingWorkout(payload);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Formulario de carga post-entrenamiento
+// ---------------------------------------------------------------------------
+//
+// Al terminar el Fibonacci ya no se postea directo: primero se abre un modal
+// para cargar reps / peso / vueltas de los bloques bodyweight y overload (la
+// lógica AMRAP del entrenamiento). El POST sale una sola vez, con o sin carga,
+// cuando el usuario toca "Guardar" o "Skip".
+//
+// Como el POST queda diferido, el snapshot del entrenamiento se escribe en
+// localStorage en el mismo instante en que suena el beep final: si la app se
+// cierra con el modal abierto, el entrenamiento se recupera en el próximo
+// arranque en vez de perderse.
+
+const PENDING_COMPLETION_KEY = "pendingCompletion_v1";
+
+/** Bloques que se cargan en el formulario. Core queda afuera a propósito. */
+const LOG_BLOCKS = [
+  { key: "bodyweight", label: "Bodyweight", hasWeight: false },
+  { key: "overload",   label: "Overload",   hasWeight: true  },
+];
+
+/** Pasadas 12 h el formulario ya no tiene sentido: el workout se postea solo. */
+const PENDING_COMPLETION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+/** Snapshot del entrenamiento terminado mientras el modal está abierto. */
+let pendingCompletion = null;
+
+function readPendingCompletion() {
+  try {
+    const raw = localStorage.getItem(PENDING_COMPLETION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.core)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingCompletion(payload) {
+  try {
+    localStorage.setItem(PENDING_COMPLETION_KEY, JSON.stringify(payload));
+  } catch { /* storage full */ }
+}
+
+function clearPendingCompletion() {
+  try {
+    localStorage.removeItem(PENDING_COMPLETION_KEY);
+  } catch { /* ignore */ }
+}
+
+/**
+ * Corre una sola vez cuando el timer Fibonacci llega al final.
+ * Toma el snapshot de las listas ANTES de limpiarlas y abre el formulario.
+ */
+function handleFibonacciComplete() {
+  const snapshot = {
+    date: new Date().toISOString(),
+    core: [...fibExerciseLists.core],
+    bodyweight: [...fibExerciseLists.bodyweight],
+    overload: [...fibExerciseLists.overload],
+    durationSec: FIB_TOTAL_SEC,
+  };
+
+  // El plan (DB + local) se limpia igual que antes: el snapshot ya tiene los
+  // nombres, así que la pantalla de setup queda lista para la próxima sesión.
+  clearCurrentWorkoutCollection();
+  resetFibExercisePlan();
+
+  // Sin ejercicios que cargar, el formulario no aporta nada: se postea directo.
+  const hasLoggableBlocks = LOG_BLOCKS.some(({ key }) => snapshot[key].length > 0);
+  if (!hasLoggableBlocks) {
+    saveCompletedWorkoutToAPI(snapshot);
+    return;
+  }
+
+  pendingCompletion = snapshot;
+  writePendingCompletion(snapshot);
+  openWorkoutLogModal(snapshot);
+}
+
+/** "" / basura → null. Nunca 0: sin cargar ≠ cero reps. */
+function parseLogNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildLogField(labelText, attribute, { decimal = false } = {}) {
+  const label = document.createElement("label");
+  label.className = "log-field";
+
+  const caption = document.createElement("span");
+  caption.className = "log-field__label";
+  caption.textContent = labelText;
+
+  const input = document.createElement("input");
+  input.type = "number";
+  input.className = "log-input";
+  input.min = "0";
+  input.placeholder = "—";
+  input.inputMode = decimal ? "decimal" : "numeric";
+  input.step = decimal ? "0.5" : "1";
+  input.max = decimal ? "999" : "999";
+  input.setAttribute(attribute, "");
+
+  label.append(caption, input);
+  return label;
+}
+
+/** Arma las secciones del formulario a partir del snapshot. */
+function renderWorkoutLogSections(snapshot) {
+  const container = document.getElementById("logSections");
+  if (!container) return;
+  container.replaceChildren();
+
+  LOG_BLOCKS.forEach(({ key, label, hasWeight }) => {
+    const names = snapshot[key] || [];
+    if (!names.length) return; // bloque vacío → sección oculta
+
+    const section = document.createElement("section");
+    section.className = "log-block";
+
+    const head = document.createElement("div");
+    head.className = "log-block__head";
+
+    const title = document.createElement("p");
+    title.className = "log-block__title";
+    title.textContent = label;
+
+    const roundsLabel = document.createElement("label");
+    roundsLabel.className = "log-rounds";
+    const roundsCaption = document.createElement("span");
+    roundsCaption.className = "log-rounds__label";
+    roundsCaption.textContent = "VUELTAS";
+    const roundsInput = document.createElement("input");
+    roundsInput.type = "number";
+    roundsInput.className = "log-input log-input--rounds";
+    roundsInput.min = "0";
+    roundsInput.max = "99";
+    roundsInput.step = "1";
+    roundsInput.inputMode = "numeric";
+    roundsInput.placeholder = "—";
+    roundsInput.setAttribute("data-log-rounds", key);
+    roundsLabel.append(roundsCaption, roundsInput);
+
+    head.append(title, roundsLabel);
+
+    const rows = document.createElement("ul");
+    rows.className = "log-rows";
+
+    names.forEach((name) => {
+      const row = document.createElement("li");
+      row.className = "log-row";
+      row.setAttribute("data-log-row", "");
+      row.setAttribute("data-log-block", key);
+      row.setAttribute("data-log-name", name);
+
+      // textContent, no innerHTML: los nombres de ejercicio son input del usuario
+      const nameEl = document.createElement("span");
+      nameEl.className = "log-row__name";
+      nameEl.textContent = name;
+
+      const fields = document.createElement("div");
+      fields.className = "log-row__fields";
+      fields.appendChild(buildLogField("REPS", "data-log-reps"));
+      if (hasWeight) {
+        fields.appendChild(buildLogField("KG", "data-log-weight", { decimal: true }));
+      }
+
+      row.append(nameEl, fields);
+      rows.appendChild(row);
+    });
+
+    section.append(head, rows);
+    container.appendChild(section);
+  });
+}
+
+function openWorkoutLogModal(snapshot) {
+  const modal = document.getElementById("logModal");
+  if (!modal) {
+    // Sin modal en el DOM (versión vieja cacheada) no hay que perder el workout.
+    finishWorkoutLog(null);
+    return;
+  }
+
+  const dateEl = document.getElementById("logModalDate");
+  if (dateEl) dateEl.textContent = dashFormatDayHeader(new Date(snapshot.date));
+
+  renderWorkoutLogSections(snapshot);
+  modal.hidden = false;
+  modal.scrollTop = 0;
+}
+
+function closeWorkoutLogModal() {
+  const modal = document.getElementById("logModal");
+  if (modal) modal.hidden = true;
+  const container = document.getElementById("logSections");
+  if (container) container.replaceChildren();
+}
+
+/**
+ * Lee el formulario. Devuelve null si no se cargó ni un dato — un formulario en
+ * blanco se comporta igual que un skip.
+ */
+function collectWorkoutLogPerformance() {
+  const container = document.getElementById("logSections");
+  if (!container) return null;
+
+  const rounds = { bodyweight: null, overload: null };
+  container.querySelectorAll("[data-log-rounds]").forEach((input) => {
+    rounds[input.getAttribute("data-log-rounds")] = parseLogNumber(input.value);
+  });
+
+  const entries = [];
+  container.querySelectorAll("[data-log-row]").forEach((row) => {
+    const reps = parseLogNumber(row.querySelector("[data-log-reps]")?.value);
+    const weightKg = parseLogNumber(row.querySelector("[data-log-weight]")?.value);
+    if (reps === null && weightKg === null) return; // fila sin cargar
+    entries.push({
+      block: row.getAttribute("data-log-block"),
+      name: row.getAttribute("data-log-name"),
+      reps,
+      weightKg,
+    });
+  });
+
+  const hasRounds = rounds.bodyweight !== null || rounds.overload !== null;
+  if (!entries.length && !hasRounds) return null;
+
+  return { rounds, entries };
+}
+
+/** Cierra el formulario y postea el workout, con carga (`performance`) o sin ella. */
+function finishWorkoutLog(performance) {
+  const snapshot = pendingCompletion;
+  pendingCompletion = null;
+  clearPendingCompletion();
+  closeWorkoutLogModal();
+  if (!snapshot) return;
+  saveCompletedWorkoutToAPI(performance ? { ...snapshot, performance } : snapshot);
+}
+
+function initWorkoutLogModal() {
+  const form = document.getElementById("logForm");
+  const skip = document.getElementById("logSkipBtn");
+
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      finishWorkoutLog(collectWorkoutLogPerformance());
+    });
+  }
+  if (skip) skip.addEventListener("click", () => finishWorkoutLog(null));
+}
+
+/**
+ * Guard de arranque: si quedó un entrenamiento sin postear (la app se cerró con
+ * el formulario abierto), se reabre el formulario. Si ya pasaron más de 12 h,
+ * se postea solo sin carga para no arrastrarlo indefinidamente.
+ */
+function resumePendingCompletion() {
+  const snapshot = readPendingCompletion();
+  if (!snapshot) return;
+
+  pendingCompletion = snapshot;
+
+  const ageMs = Date.now() - new Date(snapshot.date).getTime();
+  if (!Number.isFinite(ageMs) || ageMs > PENDING_COMPLETION_MAX_AGE_MS) {
+    finishWorkoutLog(null);
+    return;
+  }
+
+  openWorkoutLogModal(snapshot);
 }
 
 // --- Persistence: named wrappers (spec-required API) ---
@@ -2948,6 +3217,7 @@ function bootstrap() {
                                // stopImmediatePropagation() para ganarle al de addExercise
   initTabataSteppers();
   initTabataModal();
+  initWorkoutLogModal();
   initNavigation();
   initExercisesSearch();
   initExercisesModalidadFilter();
@@ -2963,6 +3233,10 @@ function bootstrap() {
   // 3. Sync remoto (async) — la DB es autoritativa sobre el plan local,
   //    y su camino de éxito dispara el flush de workouts pendientes.
   loadCurrentWorkoutFromDB();
+
+  // 4. Guard: entrenamiento terminado que quedó sin postear (ver
+  //    PENDING_COMPLETION_KEY). Va último para que el modal quede arriba de todo.
+  resumePendingCompletion();
 }
 
 bootstrap();

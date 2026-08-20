@@ -241,6 +241,34 @@
       </div><!-- /tabata-modal__sheet -->
     </div><!-- /tabataModal -->
 
+    <!-- ══════════════════════════════════════════════ WORKOUT LOG MODAL -->
+    <!-- Aparece al terminar el Fibonacci, ANTES de postear a Mongo. Sin scrim
+         clickeable ni botón de cerrar: se sale sólo por "Guardar" o "Skip", así
+         no se pierde la carga por un tap al costado. -->
+    <div id="logModal" class="log-modal" hidden role="dialog" aria-modal="true" aria-labelledby="logModalTitle">
+      <div class="log-modal__scrim"></div>
+      <div class="log-modal__sheet">
+
+        <div class="log-modal__bar">
+          <p class="log-modal__eyebrow">WORKOUT COMPLETO</p>
+          <p class="log-modal__date" id="logModalDate">—</p>
+        </div>
+
+        <h2 class="log-modal__title" id="logModalTitle">Cargá la vuelta</h2>
+        <p class="log-modal__hint">Dejá en blanco lo que no quieras registrar.</p>
+
+        <form id="logForm" class="log-form" novalidate>
+          <div id="logSections"></div>
+
+          <div class="log-modal__actions">
+            <button type="submit" class="btn-start" id="logSaveBtn">Guardar ✓</button>
+            <button type="button" class="btn-secondary" id="logSkipBtn">Skip</button>
+          </div>
+        </form>
+
+      </div><!-- /log-modal__sheet -->
+    </div><!-- /logModal -->
+
     <!-- ══════════════════════════════════════════════ DASHBOARD -->
     <div id="view-dashboard" class="app-view" hidden>
       <div class="dash-wrapper">

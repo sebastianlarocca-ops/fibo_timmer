@@ -878,6 +878,191 @@ h1 {
 }
 .tabata-modal__minimize-btn:hover { color: var(--fg); }
 
+/* ── Workout log modal ───────────────────────────────────────────
+   Formulario de carga que se abre al terminar el Fibonacci. Comparte el
+   lenguaje del bottom-sheet de Tabata, pero por encima (z-index mayor) y sin
+   scrim clickeable. */
+.log-modal {
+  position: fixed;
+  inset: 0;
+  /* Por encima de la nav (500) y del modal de Tabata (400): mientras se carga
+     el entrenamiento no hay que poder tocar nada más. */
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.log-modal__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0,0,0,0.78);
+}
+
+.log-modal__sheet {
+  position: relative;
+  z-index: 2;
+  background: #141416;
+  border-radius: 28px 28px 0 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 0 1.25rem 2rem;
+  max-height: 92vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: sheet-up 200ms cubic-bezier(0.22,1,0.36,1);
+}
+
+.log-modal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 16px 0 12px;
+  position: sticky;
+  top: 0;
+  background: #141416;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.log-modal__eyebrow {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--done);
+}
+
+.log-modal__date {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+
+.log-modal__title {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 26px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
+.log-modal__hint {
+  margin: 0 0 1.25rem;
+  font-size: 13px;
+  color: var(--fg-mute);
+}
+
+.log-block { margin-bottom: 1.5rem; }
+
+.log-block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.log-block__title {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--work);
+}
+
+.log-rounds {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.log-rounds__label,
+.log-field__label {
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--fg-dim);
+}
+
+.log-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.log-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+
+.log-row__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.log-row__fields {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: none;
+}
+
+.log-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Inputs numéricos: sin spinners, monoespaciados, tamaño 16px para que iOS no
+   haga zoom al enfocarlos. */
+.log-input {
+  width: 58px;
+  padding: 8px 6px;
+  text-align: center;
+  font-family: var(--font-num);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-sm);
+  -moz-appearance: textfield;
+}
+.log-input::-webkit-outer-spin-button,
+.log-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.log-input::placeholder { color: var(--fg-dim); }
+.log-input:focus {
+  outline: none;
+  border-color: rgba(255,106,44,0.5);
+}
+.log-input--rounds { width: 52px; }
+
+.log-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
 /* Tabata card inside modal */
 .tabata-card { padding: 0; }
 
