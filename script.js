@@ -911,6 +911,13 @@ const PENDING_COMPLETION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 /** Snapshot del entrenamiento terminado mientras el modal está abierto. */
 let pendingCompletion = null;
 
+/**
+ * Modo en el que está abierto el formulario:
+ *   "create" → entrenamiento recién terminado, todavía sin postear (POST)
+ *   "edit"   → workout ya guardado, se edita su carga desde el dashboard (PATCH)
+ */
+let logModalContext = { mode: "create", workout: null };
+
 function readPendingCompletion() {
   try {
     const raw = localStorage.getItem(PENDING_COMPLETION_KEY);
@@ -973,7 +980,7 @@ function parseLogNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function buildLogField(labelText, attribute, { decimal = false } = {}) {
+function buildLogField(labelText, attribute, { decimal = false, value = null } = {}) {
   const label = document.createElement("label");
   label.className = "log-field";
 
@@ -990,13 +997,19 @@ function buildLogField(labelText, attribute, { decimal = false } = {}) {
   input.step = decimal ? "0.5" : "1";
   input.max = decimal ? "999" : "999";
   input.setAttribute(attribute, "");
+  if (value !== null && value !== undefined) input.value = String(value);
 
   label.append(caption, input);
   return label;
 }
 
-/** Arma las secciones del formulario a partir del snapshot. */
-function renderWorkoutLogSections(snapshot) {
+/** Arma las secciones del formulario a partir del snapshot, precargando los
+ *  valores ya guardados cuando se está editando. */
+function renderWorkoutLogSections(snapshot, performance) {
+  const previo = performance
+    ? buildPerformanceLookup({ performance })
+    : { bodyweight: new Map(), overload: new Map() };
+  const vueltas = (performance && performance.rounds) || {};
   const container = document.getElementById("logSections");
   if (!container) return;
   container.replaceChildren();
@@ -1029,6 +1042,9 @@ function renderWorkoutLogSections(snapshot) {
     roundsInput.inputMode = "numeric";
     roundsInput.placeholder = "—";
     roundsInput.setAttribute("data-log-rounds", key);
+    if (vueltas[key] !== null && vueltas[key] !== undefined) {
+      roundsInput.value = String(vueltas[key]);
+    }
     roundsLabel.append(roundsCaption, roundsInput);
 
     head.append(title, roundsLabel);
@@ -1048,11 +1064,17 @@ function renderWorkoutLogSections(snapshot) {
       nameEl.className = "log-row__name";
       nameEl.textContent = name;
 
+      const guardado = previo[key].get(String(name).trim().toLowerCase());
+
       const fields = document.createElement("div");
       fields.className = "log-row__fields";
-      fields.appendChild(buildLogField("REPS", "data-log-reps"));
+      fields.appendChild(
+        buildLogField("REPS", "data-log-reps", { value: guardado && guardado.reps })
+      );
       if (hasWeight) {
-        fields.appendChild(buildLogField("KG", "data-log-weight", { decimal: true }));
+        fields.appendChild(
+          buildLogField("KG", "data-log-weight", { decimal: true, value: guardado && guardado.weightKg })
+        );
       }
 
       row.append(nameEl, fields);
@@ -1064,18 +1086,33 @@ function renderWorkoutLogSections(snapshot) {
   });
 }
 
-function openWorkoutLogModal(snapshot) {
+const LOG_MODAL_TEXTS = {
+  create: { eyebrow: "WORKOUT COMPLETO", title: "Cargá la vuelta", secondary: "Skip" },
+  edit:   { eyebrow: "EDITAR CARGA",     title: "Editar la vuelta", secondary: "Cancelar" },
+};
+
+function openWorkoutLogModal(workout, mode = "create") {
   const modal = document.getElementById("logModal");
   if (!modal) {
     // Sin modal en el DOM (versión vieja cacheada) no hay que perder el workout.
-    finishWorkoutLog(null);
+    if (mode === "create") finishWorkoutLog(null);
     return;
   }
 
-  const dateEl = document.getElementById("logModalDate");
-  if (dateEl) dateEl.textContent = dashFormatDayHeader(new Date(snapshot.date));
+  logModalContext = { mode, workout };
 
-  renderWorkoutLogSections(snapshot);
+  const textos = LOG_MODAL_TEXTS[mode];
+  const eyebrowEl   = document.getElementById("logModalEyebrow");
+  const titleEl     = document.getElementById("logModalTitle");
+  const secondaryEl = document.getElementById("logSkipBtn");
+  if (eyebrowEl)   eyebrowEl.textContent = textos.eyebrow;
+  if (titleEl)     titleEl.textContent = textos.title;
+  if (secondaryEl) secondaryEl.textContent = textos.secondary;
+
+  const dateEl = document.getElementById("logModalDate");
+  if (dateEl) dateEl.textContent = dashFormatDayHeader(new Date(workout.date));
+
+  renderWorkoutLogSections(workout, mode === "edit" ? workout.performance : null);
   modal.hidden = false;
   modal.scrollTop = 0;
 }
@@ -1085,6 +1122,7 @@ function closeWorkoutLogModal() {
   if (modal) modal.hidden = true;
   const container = document.getElementById("logSections");
   if (container) container.replaceChildren();
+  logModalContext = { mode: "create", workout: null };
 }
 
 /**
@@ -1129,6 +1167,56 @@ function finishWorkoutLog(performance) {
   saveCompletedWorkoutToAPI(performance ? { ...snapshot, performance } : snapshot);
 }
 
+/**
+ * PATCH de la carga de un workout ya guardado. `performance: null` la borra.
+ * A diferencia del alta, acá no hay cola de reintentos: si falla, se avisa y el
+ * usuario reintenta — el workout ya está a salvo en la DB.
+ */
+async function patchWorkoutPerformance(id, performance) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/workouts/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ performance }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // Cache invalidado + refetch: el dashboard vuelve a dibujarse con lo guardado.
+    try { localStorage.removeItem(DASH_CACHE_KEY); } catch { /* ignore */ }
+    await loadDashboard();
+  } catch (err) {
+    console.warn("[API] No se pudo actualizar la carga:", err.message);
+    const msg = document.getElementById("dashMessage");
+    if (msg) {
+      msg.textContent = "No se pudo guardar la carga — probá de nuevo.";
+      msg.className   = "dash-message dash-message--error";
+      msg.hidden      = false;
+    }
+  }
+}
+
+/** Submit del formulario, en cualquiera de los dos modos. */
+function submitWorkoutLog() {
+  const { mode, workout } = logModalContext;
+  const performance = collectWorkoutLogPerformance();
+
+  if (mode === "edit") {
+    closeWorkoutLogModal();
+    if (workout) patchWorkoutPerformance(workout._id, performance);
+    return;
+  }
+  finishWorkoutLog(performance);
+}
+
+/** Botón secundario: "Skip" en el alta, "Cancelar" en la edición. */
+function dismissWorkoutLog() {
+  if (logModalContext.mode === "edit") {
+    closeWorkoutLogModal(); // cancelar no toca nada
+    return;
+  }
+  finishWorkoutLog(null);
+}
+
 function initWorkoutLogModal() {
   const form = document.getElementById("logForm");
   const skip = document.getElementById("logSkipBtn");
@@ -1136,10 +1224,10 @@ function initWorkoutLogModal() {
   if (form) {
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      finishWorkoutLog(collectWorkoutLogPerformance());
+      submitWorkoutLog();
     });
   }
-  if (skip) skip.addEventListener("click", () => finishWorkoutLog(null));
+  if (skip) skip.addEventListener("click", dismissWorkoutLog);
 }
 
 /**
@@ -1621,17 +1709,46 @@ function groupByMonth(workouts) {
 }
 
 /** Returns { "YYYY-MM-DD": { date, core[], bodyweight[], overload[] } } */
+/**
+ * Agrupa por día conservando cada workout entero (no fusiona las listas): la
+ * carga de reps/peso pertenece a un workout puntual, y el historial necesita el
+ * `_id` de cada uno. Dos sesiones el mismo día se dibujan como dos tablas.
+ */
 function groupByDay(workouts) {
   const map = {};
   workouts.forEach((w) => {
     const d = new Date(w.date);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    if (!map[key]) map[key] = { date: d, core: [], bodyweight: [], overload: [] };
-    map[key].core.push(...(w.core || []));
-    map[key].bodyweight.push(...(w.bodyweight || []));
-    map[key].overload.push(...(w.overload || []));
+    if (!map[key]) map[key] = { date: d, workouts: [] };
+    map[key].workouts.push(w);
+  });
+  // Orden cronológico dentro del día (la API los devuelve del más nuevo al más viejo)
+  Object.values(map).forEach((day) => {
+    day.workouts.sort((a, b) => new Date(a.date) - new Date(b.date));
   });
   return map;
+}
+
+/** Índice bloque → nombre normalizado → entry, para pintar la carga en la tabla. */
+function buildPerformanceLookup(workout) {
+  const byBlock = { bodyweight: new Map(), overload: new Map() };
+  const entries = (workout.performance && workout.performance.entries) || [];
+  entries.forEach((entry) => {
+    const map = byBlock[entry.block];
+    if (map) map.set(String(entry.name).trim().toLowerCase(), entry);
+  });
+  return byBlock;
+}
+
+/** "10 × 22.5kg" / "10 reps" / "22.5kg" / "" según lo que se haya cargado. */
+function formatLoadLabel(entry) {
+  if (!entry) return "";
+  const reps = entry.reps ?? null;
+  const kg = entry.weightKg ?? null;
+  if (reps !== null && kg !== null) return `${reps} × ${kg}kg`;
+  if (reps !== null) return `${reps} reps`;
+  if (kg !== null) return `${kg}kg`;
+  return "";
 }
 
 function dashFormatDayHeader(d) {
@@ -1973,6 +2090,25 @@ function renderPatronBalance(balance) {
   });
 }
 
+/** Workouts dibujados en el historial, por id — los usa el modal de edición. */
+const dashWorkoutsById = new Map();
+
+/**
+ * Un solo listener en la lista del historial: las tablas se redibujan enteras en
+ * cada render, así que enganchar botón por botón se perdería en el próximo.
+ */
+function initDashboardEditing() {
+  const historyList = document.getElementById("dashHistoryList");
+  if (!historyList) return;
+
+  historyList.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-edit-workout]");
+    if (!btn) return;
+    const workout = dashWorkoutsById.get(btn.getAttribute("data-edit-workout"));
+    if (workout) openWorkoutLogModal(workout, "edit");
+  });
+}
+
 function renderDashboard(workouts, patronesByName) {
   const wrapper     = document.querySelector(".dash-wrapper");
   const cards       = document.getElementById("dashCards");
@@ -2014,14 +2150,14 @@ function renderDashboard(workouts, patronesByName) {
 
   if (!historyList) return;
   historyList.replaceChildren();
+  dashWorkoutsById.clear();
 
   const byDay = groupByDay(workouts);
   Object.keys(byDay)
     .sort()
     .reverse()
     .forEach((key) => {
-      const { date, core, bodyweight, overload } = byDay[key];
-      const rows = Math.max(core.length, bodyweight.length, overload.length, 1);
+      const { date, workouts: dayWorkouts } = byDay[key];
 
       const li = document.createElement("li");
       li.className = "dash-history__item";
@@ -2030,34 +2166,135 @@ function renderDashboard(workouts, patronesByName) {
       dateEl.className = "dash-history__date";
       dateEl.textContent = dashFormatDayHeader(date);
 
-      const table = document.createElement("table");
-      table.className = "dash-day-table";
+      const head = document.createElement("div");
+      head.className = "dash-history__head";
+      head.appendChild(dateEl);
 
-      const thead = document.createElement("thead");
-      const headRow = document.createElement("tr");
-      ["Core", "BD", "OV"].forEach((label) => {
-        const th = document.createElement("th");
-        th.textContent = label;
-        headRow.appendChild(th);
+      // Con una sola sesión el botón entra en la línea de la fecha; con varias,
+      // cada una lleva el suyo junto a su hora.
+      const variasSesiones = dayWorkouts.length > 1;
+      if (!variasSesiones) head.appendChild(buildEditButton(dayWorkouts[0]));
+
+      li.appendChild(head);
+      dayWorkouts.forEach((w) => {
+        dashWorkoutsById.set(String(w._id), w);
+        li.appendChild(buildWorkoutBlock(w, variasSesiones));
       });
-      thead.appendChild(headRow);
-
-      const tbody = document.createElement("tbody");
-      for (let i = 0; i < rows; i++) {
-        const tr = document.createElement("tr");
-        // textContent, no innerHTML: los nombres de ejercicio son input del usuario
-        [core[i], bodyweight[i], overload[i]].forEach((name) => {
-          const td = document.createElement("td");
-          td.textContent = name || "";
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      }
-
-      table.append(thead, tbody);
-      li.append(dateEl, table);
       historyList.appendChild(li);
     });
+}
+
+/** Botón que abre el formulario de carga sobre un workout ya guardado. */
+function buildEditButton(workout) {
+  const rounds = (workout.performance && workout.performance.rounds) || {};
+  const tieneCarga = !!(workout.performance && (
+    ((workout.performance.entries || []).length) ||
+    rounds.bodyweight !== null && rounds.bodyweight !== undefined ||
+    rounds.overload !== null && rounds.overload !== undefined
+  ));
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "dash-workout__edit";
+  btn.textContent = tieneCarga ? "Editar" : "+ Carga";
+  btn.setAttribute("data-edit-workout", String(workout._id));
+  return btn;
+}
+
+/**
+ * Un workout dentro del historial. Con varias sesiones en el día lleva su propia
+ * barra (hora + botón); con una sola, el botón ya está junto a la fecha.
+ */
+function buildWorkoutBlock(workout, conBarra) {
+  const wrap = document.createElement("div");
+  wrap.className = "dash-workout";
+
+  if (conBarra) {
+    const bar = document.createElement("div");
+    bar.className = "dash-workout__bar";
+
+    const time = document.createElement("span");
+    time.className = "dash-workout__time";
+    time.textContent = new Date(workout.date).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    bar.append(time, buildEditButton(workout));
+    wrap.appendChild(bar);
+  }
+
+  wrap.appendChild(buildWorkoutTable(workout));
+  return wrap;
+}
+
+/** Tabla de un workout: Core / BD / OV, con las vueltas en el encabezado y la
+ *  carga (reps × kg) debajo de cada ejercicio. */
+function buildWorkoutTable(workout) {
+  const core       = workout.core || [];
+  const bodyweight = workout.bodyweight || [];
+  const overload   = workout.overload || [];
+  const rows = Math.max(core.length, bodyweight.length, overload.length, 1);
+
+  const perf   = buildPerformanceLookup(workout);
+  const rounds = (workout.performance && workout.performance.rounds) || {};
+
+  const table = document.createElement("table");
+  table.className = "dash-day-table";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  [
+    { label: "Core", block: null },
+    { label: "BD",   block: "bodyweight" },
+    { label: "OV",   block: "overload" },
+  ].forEach(({ label, block }) => {
+    const th = document.createElement("th");
+    th.textContent = label;
+    const vueltas = block ? rounds[block] ?? null : null;
+    if (vueltas !== null) {
+      const badge = document.createElement("span");
+      badge.className = "dash-day-table__rounds";
+      badge.textContent = `×${vueltas}`;
+      th.appendChild(badge);
+    }
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+
+  const tbody = document.createElement("tbody");
+  for (let i = 0; i < rows; i++) {
+    const tr = document.createElement("tr");
+    [
+      { name: core[i],       block: null },
+      { name: bodyweight[i], block: "bodyweight" },
+      { name: overload[i],   block: "overload" },
+    ].forEach(({ name, block }) => {
+      const td = document.createElement("td");
+      // Sin nombre la celda queda vacía a propósito: `td:empty::after` dibuja el "—".
+      if (name) {
+        // textContent, no innerHTML: los nombres de ejercicio son input del usuario
+        const nameEl = document.createElement("span");
+        nameEl.textContent = name;
+        td.appendChild(nameEl);
+
+        const load = block
+          ? formatLoadLabel(perf[block].get(String(name).trim().toLowerCase()))
+          : "";
+        if (load) {
+          const loadEl = document.createElement("span");
+          loadEl.className = "dash-load";
+          loadEl.textContent = load;
+          td.appendChild(loadEl);
+        }
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+
+  table.append(thead, tbody);
+  return table;
 }
 
 function setDashLoadingState() {
@@ -3218,6 +3455,7 @@ function bootstrap() {
   initTabataSteppers();
   initTabataModal();
   initWorkoutLogModal();
+  initDashboardEditing();
   initNavigation();
   initExercisesSearch();
   initExercisesModalidadFilter();

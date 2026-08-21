@@ -1476,6 +1476,14 @@ h1 {
   animation: chip-in 0.18s ease;
 }
 
+.dash-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 10px;
+}
+
 .dash-history__date {
   font-family: var(--font-num);
   font-size: 11px;
@@ -1483,7 +1491,6 @@ h1 {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--work);
-  margin-bottom: 10px;
 }
 
 .dash-day-table {
@@ -1510,6 +1517,71 @@ h1 {
   font-weight: 500;
   vertical-align: top;
   width: 33.33%;
+}
+
+/* Un workout dentro de la card del día */
+.dash-workout__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 22px;
+  margin-bottom: 2px;
+}
+
+.dash-workout__time {
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+}
+
+/* Discreto a propósito: el historial se lee mucho más de lo que se edita */
+.dash-workout__edit {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms, background 150ms;
+}
+.dash-workout__edit:hover {
+  color: var(--work);
+  border-color: rgba(255,106,44,0.4);
+  background: rgba(255,106,44,0.08);
+}
+.dash-workout__edit:active { transform: translateY(1px); }
+
+.dash-workout + .dash-workout {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255,255,255,0.08);
+}
+
+/* Vueltas del bloque, en el encabezado de la columna: "BD ×4" */
+.dash-day-table__rounds {
+  margin-left: 0.4em;
+  color: var(--done);
+  letter-spacing: 0.06em;
+}
+
+/* Carga registrada, debajo del nombre del ejercicio */
+.dash-load {
+  display: block;
+  font-family: var(--font-num);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--done);
+  margin-top: 1px;
 }
 
 .dash-day-table td:empty::after {

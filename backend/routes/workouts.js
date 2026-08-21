@@ -152,6 +152,37 @@ router.get("/", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /api/workouts/:id
+// Editar sólo la carga (reps / peso / vueltas) de un workout ya guardado.
+// El resto del documento — fecha, listas de ejercicios, duración — no se toca:
+// esto existe para completar lo que quedó en blanco al hacer "skip".
+// `performance: null` (o vacío) borra la carga.
+// ---------------------------------------------------------------------------
+router.patch("/:id", async (req, res) => {
+  try {
+    const performance = sanitizePerformance(req.body.performance);
+    const update = performance
+      ? { $set: { performance } }
+      : { $unset: { performance: "" } };
+
+    const workout = await Workout.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    }).select("-__v");
+
+    if (!workout) return res.status(404).json({ error: "Workout not found." });
+
+    console.log(
+      `[workout patched] id=${workout._id}  performance=${performance ? "set" : "unset"}`
+    );
+    return res.json(workout);
+  } catch (err) {
+    console.error("[PATCH /api/workouts/:id] error:", err.message);
+    return res.status(500).json({ error: "Failed to update workout." });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/workouts/:id
 // Retrieve a single workout by MongoDB ObjectId.
 // ---------------------------------------------------------------------------
