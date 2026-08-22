@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const Workout = require("../models/workout");
 const Exercise = require("../models/exercise");
+const { readParams, buildRecommendation } = require("../utils/recommendation");
 
 const PATRONES = Exercise.PATRONES; // empuje, traccion, rodilla_dominante, cadera_dominante, core
 const BLOQUES = ["core", "bodyweight", "overload"];
@@ -326,6 +327,50 @@ router.get("/pulse", async (req, res) => {
   } catch (err) {
     console.error("[GET /api/analytics/pulse] error:", err.message);
     return res.status(500).json({ error: "Failed to build pulse." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/analytics/recommendation
+//
+// Recomendación del próximo entrenamiento por balance de patrones.
+// Toda la parametrización del motor va por query string, así que ajustar los
+// criterios NO requiere redeploy. Ver DEFAULTS en utils/recommendation.js:
+//
+//   windowSessions=12     últimas N sesiones que se miran
+//   maxAgeDays=60         se descartan las sesiones más viejas que esto
+//   recoveryDays=7        días hasta que un patrón cuenta como "descansado"
+//   wBalance=0.65         peso del déficit de balance   (se normaliza con wFresh)
+//   wFresh=0.35           peso de la frescura
+//   correctivePattern=traccion   patrón con refuerzo correctivo ("none" lo apaga)
+//   correctiveFactor=1.5  cuánto se amplifica su déficit mientras esté por debajo
+//   maxNew=2              tope de ejercicios sin estrenar por sesión
+//   avoidLastSessions=1   no repetir ejercicios de las últimas N sesiones
+//   slotsCore=1 slotsBodyweight=2 slotsOverload=2
+//   alternatives=2        recambios que se ofrecen por slot
+// ---------------------------------------------------------------------------
+router.get("/recommendation", async (req, res) => {
+  if (!checkToken(req, res)) return;
+
+  try {
+    const params = readParams(req.query);
+
+    const [workouts, exercises] = await Promise.all([
+      Workout.find().sort({ date: -1 }).limit(1000).select("date core bodyweight overload").lean(),
+      Exercise.find().select("name patrones modalidad lastPerformed daysPerformed link -_id").lean(),
+    ]);
+
+    if (!exercises.length) {
+      return res.status(409).json({
+        error: "El catálogo de ejercicios está vacío: no hay con qué armar una sesión.",
+      });
+    }
+
+    const result = buildRecommendation(workouts, exercises, params, Date.now());
+    return res.json(result);
+  } catch (err) {
+    console.error("[GET /api/analytics/recommendation] error:", err.message);
+    return res.status(500).json({ error: "Failed to build recommendation." });
   }
 });
 
