@@ -8,6 +8,7 @@ const cors = require("cors");
 const workoutsRouter = require("./routes/workouts");
 const exercisesRouter = require("./routes/exercises");
 const currentWorkoutRouter = require("./routes/current-workout");
+const analyticsRouter = require("./routes/analytics");
 
 // ---------------------------------------------------------------------------
 // App setup
@@ -27,6 +28,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use("/api/workouts", workoutsRouter);
 app.use("/api/exercises", exercisesRouter);
 app.use("/api/current-workout", currentWorkoutRouter);
+app.use("/api/analytics", analyticsRouter);
 
 // Health-check — useful for Render's zero-downtime checks
 app.get("/health", (_req, res) => {
@@ -70,6 +72,8 @@ mongoose
       console.log(`   POST /api/current-workout        — add one exercise to plan`);
       console.log(`   DELETE /api/current-workout/:id  — remove one exercise`);
       console.log(`   DELETE /api/current-workout/all  — clear the whole plan`);
+      console.log(`   GET  /api/analytics/history      — historico cruzado con patrones`);
+      console.log(`   GET  /api/analytics/pulse        — chequeo liviano de novedades`);
       console.log(`   GET  /health                     — connection check`);
     });
   })
