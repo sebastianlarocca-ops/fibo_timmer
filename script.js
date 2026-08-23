@@ -1304,6 +1304,61 @@ async function fetchRecommendation() {
   }
 }
 
+/* ── Sheet "cómo funciona la recomendación" ───────────────────────────────
+ *
+ * Contenido estático: explica el criterio, no muestra datos. Por eso no pide
+ * nada al server y abre instantáneo aunque no haya conexión.
+ */
+
+/** Devuelve el foco a donde estaba al cerrar, para no perder el lugar. */
+let _recHelpVolverA = null;
+
+function openRecHelp() {
+  const modal = document.getElementById("recHelp");
+  if (!modal) return;
+  _recHelpVolverA = document.activeElement;
+  modal.hidden = false;
+  // El sheet scrollea por dentro; sin esto el fondo scrollea detrás en iOS.
+  document.body.style.overflow = "hidden";
+  const cerrar = document.getElementById("recHelpClose");
+  if (cerrar) cerrar.focus();
+}
+
+function closeRecHelp() {
+  const modal = document.getElementById("recHelp");
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  document.body.style.overflow = "";
+  const sheet = document.getElementById("recHelpSheet");
+  if (sheet) sheet.scrollTop = 0; // la próxima apertura arranca de arriba
+
+  // El foco tiene que salir del sheet sí o sí: si se queda adentro queda sobre un
+  // elemento con display:none y el teclado deja de responder. Si lo que había
+  // guardado ya no sirve (el <body>, o un nodo que se fue del DOM), cae al "?",
+  // que es de donde vino el usuario.
+  const previo = _recHelpVolverA;
+  _recHelpVolverA = null;
+  const destino =
+    previo && previo.isConnected && typeof previo.focus === "function" && previo !== document.body
+      ? previo
+      : document.getElementById("recHelpBtn");
+  if (destino) destino.focus();
+}
+
+function initRecHelp() {
+  const abrir  = document.getElementById("recHelpBtn");
+  const cerrar = document.getElementById("recHelpClose");
+  const scrim  = document.getElementById("recHelpScrim");
+
+  if (abrir)  abrir.addEventListener("click", openRecHelp);
+  if (cerrar) cerrar.addEventListener("click", closeRecHelp);
+  if (scrim)  scrim.addEventListener("click", closeRecHelp);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeRecHelp();
+  });
+}
+
 function initSuggestPlan() {
   const btn = document.getElementById("suggestPlanBtn");
   if (!btn) return;
@@ -4015,6 +4070,7 @@ function bootstrap() {
   initExercisesPatronFilter();
   initExerciseAddForm();
   initSuggestPlan();
+  initRecHelp();
 
   // 2. Primer render
   fibonacciResetUi();

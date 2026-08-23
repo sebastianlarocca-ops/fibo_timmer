@@ -52,10 +52,14 @@
                renderRecommendation() se agregan al plan con un click, igual que
                las de la pestaña List. -->
           <div class="rec">
-            <button type="button" id="suggestPlanBtn" class="rec-btn"
-              aria-expanded="false" aria-controls="recResult">
-              Suggest session
-            </button>
+            <div class="rec-actions">
+              <button type="button" id="suggestPlanBtn" class="rec-btn"
+                aria-expanded="false" aria-controls="recResult">
+                Suggest session
+              </button>
+              <button type="button" id="recHelpBtn" class="rec-help-btn"
+                aria-label="How the suggestion works" aria-haspopup="dialog">?</button>
+            </div>
             <div id="recResult" class="rec-result" hidden aria-live="polite"></div>
           </div>
 
@@ -378,6 +382,134 @@
     <!-- Vive fuera de las vistas y es position:fixed: adentro de #view-exercises
          quedaba tapado por el [hidden] de la vista al usarlo desde el timer. -->
     <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>
+
+    <!-- Cómo funciona la recomendación. Bottom sheet con el mismo patrón que
+         #tabataModal: scrim + sheet, se cierra por scrim, botón y Escape. -->
+    <div id="recHelp" class="rec-help" hidden role="dialog" aria-modal="true"
+      aria-labelledby="recHelpTitle">
+      <div class="rec-help__scrim" id="recHelpScrim"></div>
+      <div class="rec-help__sheet" id="recHelpSheet">
+
+        <div class="rec-help__bar">
+          <h2 id="recHelpTitle" class="rec-help__title">How your session is picked</h2>
+          <button type="button" class="rec-help__close" id="recHelpClose"
+            aria-label="Close">&times;</button>
+        </div>
+
+        <p class="rec-help__lede">The system knows nothing about muscles or strength.
+          All it does is count what share of your training went to each movement
+          pattern, and propose what's missing. Everything else is rules so that
+          simple idea doesn't do something dumb.</p>
+
+        <div class="rec-help__patterns">
+          <span class="rec-help__chip">Push H</span>
+          <span class="rec-help__chip">Push V</span>
+          <span class="rec-help__chip">Pull</span>
+          <span class="rec-help__chip">Knee</span>
+          <span class="rec-help__chip">Hip</span>
+        </div>
+        <p class="rec-help__note">Five patterns compete for the four non-core slots.
+          Target is <b>20% each</b> — that's just 1 &divide; 5, so it moves on its own
+          if the list ever changes. Core sits out: it has its own block in every
+          session.</p>
+
+        <h3 class="rec-help__h">The seven steps</h3>
+        <p class="rec-help__note">They run in this order, each one using what the
+          previous produced.</p>
+
+        <ol class="rec-help__steps">
+          <li>
+            <b>Picks what to look at.</b> Your last 12 sessions, dropping anything
+            older than 60 days. It counts sessions, not calendar days — a two-week
+            break would leave a "last 30 days" window deciding on three workouts.
+          </li>
+          <li>
+            <b>Counts patterns, not exercises.</b> Every exercise adds a point to each
+            pattern it trains. A burpee is horizontal push <em>and</em> knee, so it
+            adds one to both. Those totals become your percentages.
+          </li>
+          <li>
+            <b>Scores each pattern.</b> Two forces pulling in different directions —
+            see below.
+          </li>
+          <li>
+            <b>Benches whatever you just trained.</b> If your last session was two days
+            ago or less, its patterns are out, however good their score. A hard veto,
+            not a discount.
+          </li>
+          <li>
+            <b>Fills the four slots one at a time.</b> After each pick it re-scores
+            everything: that pattern's share goes up and its rest resets to zero, so it
+            ranks lower next round. A cap of two slots per pattern keeps one from
+            taking the whole session.
+          </li>
+          <li>
+            <b>Only then picks the actual exercise.</b> Never-done ones first (max two
+            new per session), then whatever you haven't done in longest. Everything
+            from your last session is off the table.
+          </li>
+          <li>
+            <b>Explains itself.</b> The sentences and bars you see are just the numbers
+            above, written out. Nothing new is calculated there.
+          </li>
+        </ol>
+
+        <h3 class="rec-help__h">The two forces</h3>
+        <div class="rec-help__scale">
+          <div class="rec-help__half">
+            <span class="rec-help__w">65%</span>
+            <span class="rec-help__wt">How far behind</span>
+            <p>How far under 20% it sits. A pattern right on target scores exactly half
+              of this.</p>
+          </div>
+          <div class="rec-help__half">
+            <span class="rec-help__w">35%</span>
+            <span class="rec-help__wt">How rested</span>
+            <p>Days since you last trained it, over seven. It maxes out at seven days —
+              resting ten or thirty is the same.</p>
+          </div>
+        </div>
+        <p class="rec-help__note">That seven-day ceiling is what lets it handle breaks
+          with no special rule. Training regularly, rest is what stops you repeating a
+          pattern two days running. After a long break every pattern maxes out at once,
+          rest stops telling them apart, and balance decides — which is exactly what
+          matters when you come back.</p>
+
+        <h3 class="rec-help__h">When the rules jam</h3>
+        <p class="rec-help__note">They can block each other. It loosens one at a time,
+          in this order, and always says so on screen.</p>
+        <ul class="rec-help__chutes">
+          <li><b>Window.</b> Back from a long break with under three sessions in range,
+            it ignores the 60-day limit and uses the last twelve however old.</li>
+          <li><b>Veto.</b> If too few rested patterns are left to fill four slots, the
+            benched ones come back — better than four exercises of the one pattern
+            still standing.</li>
+          <li><b>Cap.</b> Last resort, a pattern takes more than two slots. An empty
+            slot is worse than a repeat.</li>
+        </ul>
+
+        <h3 class="rec-help__h">What it deliberately doesn't do</h3>
+        <ul class="rec-help__nots">
+          <li><b>No randomness.</b> Same data, same answer, every time — so you can
+            always audit why it proposed what it did. Variety comes from the
+            alternates listed under each exercise.</li>
+          <li><b>Doesn't look at load.</b> Only two of your sessions have reps and
+            weight logged. It counts appearances, not volume.</li>
+          <li><b>Doesn't measure intensity or fatigue.</b> Its only notion of recovery
+            is time since the last time.</li>
+          <li><b>Once is the same as three times.</b> For rest, only the date counts.
+            Volume enters through the window percentage, which moves slower.</li>
+        </ul>
+
+        <h3 class="rec-help__h">The limit worth knowing</h3>
+        <p class="rec-help__note">It can only propose what's in your catalog.
+          <b>Vertical push has two bodyweight exercises</b> — hand stand hold and hand
+          stand walk. Every time that pattern wins a bodyweight slot, it's one of those
+          two. Pull and hip sit at three each. When a pattern keeps repeating the same
+          exercise, that's the catalog talking, not the engine.</p>
+
+      </div>
+    </div>
 
     <script src="script.js"></script>
   </body>
