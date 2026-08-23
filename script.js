@@ -784,7 +784,6 @@ const REC_PATRON_LABEL = {
   rodilla_dominante: "Knee",
   cadera_dominante: "Hip",
   core: "Core",
-  empuje: "Push", // legado: sólo aparece si quedó algún documento sin migrar
 };
 
 let _recCargando = false;
@@ -2430,7 +2429,6 @@ const PATRON_LABELS = {
   rodilla_dominante: "Knee",
   cadera_dominante:  "Hip",
   core:              "Core",
-  empuje:            "Push", // legado, ver PATRONES en el modelo del backend
 };
 // Sólo BD y OV: el bloque de core es 100% patrón core por definición.
 const PATRON_BLOCKS = [

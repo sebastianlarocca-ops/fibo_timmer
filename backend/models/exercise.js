@@ -16,9 +16,6 @@ const PATRONES = [
   "rodilla_dominante",
   "cadera_dominante",
   "core",
-  // Legado: se acepta para que los documentos sin migrar no rompan al guardarse.
-  // Sale del enum una vez que la colección no lo use más.
-  "empuje",
 ];
 
 const exerciseSchema = new mongoose.Schema(
