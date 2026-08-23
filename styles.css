@@ -504,15 +504,22 @@ h1 {
 
 /* Sólo aparece si el ejercicio tiene video. Mismo lenguaje que el ▶ de List,
    más chico porque acá compite con el chip de patrón y la antigüedad. */
-.rec-row__video {
+/* El slot reserva la columna en TODAS las filas; .rec-row__video lo pinta sólo
+   cuando hay video. Son clases separadas a propósito: el guard de click de la
+   fila busca .rec-row__video, y si el hueco la compartiera un toque sobre él
+   cancelaría el alta. */
+.rec-row__vslot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border: 1px solid rgba(255,106,44,0.35);
   border-radius: 999px;
+}
+
+.rec-row__video {
+  border: 1px solid rgba(255,106,44,0.35);
   background: rgba(255,106,44,0.12);
   color: var(--work);
   font-size: 9px;

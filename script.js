@@ -897,22 +897,6 @@ function recRow({ name, bloque, patron, esNuevo, daysSinceLast, link, esAlternat
   nameEl.textContent = name; // textContent, no innerHTML: es input del usuario
   row.appendChild(nameEl);
 
-  // El ▶ sólo aparece si el ejercicio tiene video cargado. Va antes del chip para
-  // que quede en la misma columna en todas las filas que lo tengan.
-  if (link) {
-    const video = document.createElement("a");
-    video.className = "rec-row__video";
-    video.href = link;
-    video.target = "_blank";
-    video.rel = "noopener noreferrer";
-    video.title = link;
-    video.setAttribute("aria-label", `Open video for ${name}`);
-    video.textContent = "\u25B6";
-    // Sin esto, abrir el video también sumaría el ejercicio al plan.
-    video.addEventListener("click", (e) => e.stopPropagation());
-    row.appendChild(video);
-  }
-
   if (patron) {
     const chip = document.createElement("span");
     chip.className = "rec-row__patron";
@@ -926,6 +910,28 @@ function recRow({ name, bloque, patron, esNuevo, daysSinceLast, link, esAlternat
     metaEl.className = "rec-row__meta" + (esNuevo ? " rec-row__meta--new" : "");
     metaEl.textContent = meta;
     row.appendChild(metaEl);
+  }
+
+  // El ▶ va último y SIEMPRE ocupa lugar, con o sin video. El chip de patrón
+  // existe en las elegidas pero no en las alternativas, así que sin un hueco fijo
+  // los íconos caían en columnas distintas de fila a fila.
+  if (link) {
+    const video = document.createElement("a");
+    video.className = "rec-row__vslot rec-row__video";
+    video.href = link;
+    video.target = "_blank";
+    video.rel = "noopener noreferrer";
+    video.title = link;
+    video.setAttribute("aria-label", `Open video for ${name}`);
+    video.textContent = "\u25B6";
+    // Sin esto, abrir el video también sumaría el ejercicio al plan.
+    video.addEventListener("click", (e) => e.stopPropagation());
+    row.appendChild(video);
+  } else {
+    const hueco = document.createElement("span");
+    hueco.className = "rec-row__vslot";
+    hueco.setAttribute("aria-hidden", "true");
+    row.appendChild(hueco);
   }
 
   const add = (e) => {
