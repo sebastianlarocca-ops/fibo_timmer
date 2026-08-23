@@ -31,7 +31,14 @@
  *                      una sesión toque más de un patrón; el re-scoreo decide
  *                      cuáles y en qué proporción.
  *
- *  5. Ejercicios     — primero los que nunca hiciste (tope `maxNew` por sesión para
+ *  5. Veto          — si la última sesión fue hace `vetoDays` días o menos, los
+ *                      patrones que ESA sesión trabajó quedan afuera. Es un corte
+ *                      duro y no un peso porque la frescura sola no alcanza: un
+ *                      déficit grande la compensa y el patrón vuelve a entrar al
+ *                      día siguiente. Cede sólo si no queda ningún patrón
+ *                      descansado con inventario.
+ *
+ *  6. Ejercicios     — primero los que nunca hiciste (tope `maxNew` por sesión para
  *                      que una tanda de altas no te deje una sesión entera de
  *                      movimientos desconocidos), después el más descansado.
  */
@@ -52,6 +59,7 @@ const DEFAULTS = {
   correctiveFactor: 1.5,
   maxNew: 2,
   avoidLastSessions: 1,
+  vetoDays: 2,
   maxSlotsPerPattern: 2,
   slotsCore: 1,
   slotsBodyweight: 2,
@@ -96,6 +104,8 @@ function readParams(query) {
     correctiveFactor: num(q.correctiveFactor, DEFAULTS.correctiveFactor, { min: 1, max: 4 }),
     maxNew: num(q.maxNew, DEFAULTS.maxNew, { min: 0, max: 5 }),
     avoidLastSessions: num(q.avoidLastSessions, DEFAULTS.avoidLastSessions, { min: 0, max: 5 }),
+    // -1 apaga el veto: ningún patrón tiene daysSinceLast <= -1.
+    vetoDays: num(q.vetoDays, DEFAULTS.vetoDays, { min: -1, max: 14 }),
     maxSlotsPerPattern: num(q.maxSlotsPerPattern, DEFAULTS.maxSlotsPerPattern, { min: 1, max: 5 }),
     slots: {
       core: num(q.slotsCore, DEFAULTS.slotsCore, { min: 0, max: 3 }),
@@ -125,7 +135,7 @@ function readParams(query) {
  * `deficitScore` mapea el déficit a 0..1, donde 0.5 = justo en el objetivo.
  * `freshScore` es 0 recién trabajado y 1 a partir de `recoveryDays` días.
  */
-function scorePattern(patron, counts, lastSeenDays, params) {
+function scorePattern(patron, counts, lastSeenDays, params, vetados = new Set()) {
   const totalSlots = PATRONES_BALANCE.reduce((acc, p) => acc + (counts[p] || 0), 0);
   const target = 1 / PATRONES_BALANCE.length;
 
@@ -143,8 +153,14 @@ function scorePattern(patron, counts, lastSeenDays, params) {
   const days = lastSeenDays[patron];
   const freshScore = days === null || days === undefined ? 1 : clamp01(days / params.recoveryDays);
 
+  // El veto se decide afuera (ver `patronesVetados` en buildRecommendation): acá
+  // sólo se transporta, para que `balanceActual` pueda mostrar por qué un patrón
+  // quedó fuera de la sesión.
+  const vetado = vetados.has(patron);
+
   return {
     patron,
+    vetado,
     score: round(params.wBalance * deficitScore + params.wFresh * freshScore, 4),
     share: round(share, 3),
     target: round(target, 3),
@@ -231,6 +247,30 @@ function buildRecommendation(workouts, exercises, params, now) {
     if (PATRONES_BALANCE.every((p) => lastSeenDays[p] !== null)) break;
   }
 
+  // ---- Veto por recuperación ----------------------------------------------
+  // Si la última sesión fue hace `vetoDays` días o menos, los patrones QUE ESA
+  // SESIÓN trabajó quedan afuera. El corte es duro y no un peso más porque la
+  // frescura sola no alcanza: un déficit grande la compensa y el patrón vuelve a
+  // entrar al día siguiente.
+  //
+  // Se mira sólo la última sesión, no "todo lo tocado en los últimos N días":
+  // entrenando seguido eso vetaría los cuatro patrones y el veto se apagaría a sí
+  // mismo por falta de candidatos.
+  const patronesVetados = new Set();
+  const ultimaSesion = workouts[0];
+  if (ultimaSesion) {
+    const diasUltima = Math.floor((now - new Date(ultimaSesion.date).getTime()) / DIA_MS);
+    if (diasUltima <= params.vetoDays) {
+      BLOQUES.forEach((bloque) =>
+        (ultimaSesion[bloque] || []).forEach((raw) =>
+          patronesDe(raw).forEach((p) => {
+            if (PATRONES_BALANCE.includes(p)) patronesVetados.add(p);
+          })
+        )
+      );
+    }
+  }
+
   // ---- Ejercicios a evitar por uso reciente -------------------------------
   const usadosReciente = new Set();
   workouts.slice(0, params.avoidLastSessions).forEach((w) =>
@@ -241,7 +281,7 @@ function buildRecommendation(workouts, exercises, params, now) {
 
   // ---- Estado inicial: cómo está el balance antes de recomendar -----------
   const balanceBefore = PATRONES_BALANCE.map((p) =>
-    scorePattern(p, counts, lastSeenDays, params)
+    scorePattern(p, counts, lastSeenDays, params, patronesVetados)
   ).sort((a, b) => b.score - a.score);
 
   // ---- Asignación de slots ------------------------------------------------
@@ -257,6 +297,7 @@ function buildRecommendation(workouts, exercises, params, now) {
   // tope, no contra `trabajo`, que arrastra el conteo de toda la ventana.
   const asignadosPorPatron = Object.fromEntries(PATRONES_BALANCE.map((p) => [p, 0]));
   let topePatronRelajado = false;
+  let vetoRelajado = false;
 
   // Copia mutable de la frescura. Cuando un patrón se lleva un slot pasa a
   // contar como trabajado HOY para las decisiones que siguen dentro de la misma
@@ -374,18 +415,32 @@ function buildRecommendation(workouts, exercises, params, now) {
 
   slotsAllenar.forEach((bloque, i) => {
     const ranking = PATRONES_BALANCE.map((p) =>
-      scorePattern(p, trabajo, frescura, params)
+      scorePattern(p, trabajo, frescura, params, patronesVetados)
     ).sort((a, b) => b.score - a.score);
 
-    // Dos pasadas. La primera respeta el tope de slots por patrón; la segunda lo
-    // ignora y sólo corre si la primera no pudo asignar nada. Sin ese fallback un
-    // tope bajo dejaría slots vacíos cada vez que los patrones todavía habilitados
-    // no tienen inventario en el bloque — y un ejercicio repetido es mejor que un
-    // hueco. Cuando pasa queda registrado en `contexto.topePatronRelajado`.
-    for (const conTope of [true, false]) {
+    // Escalera de tres pasadas, cada una afloja una restricción y sólo corre si
+    // la anterior no pudo asignar nada. Un slot vacío es peor que cualquiera de
+    // las dos concesiones.
+    //
+    //   1. veto + tope  — el caso normal
+    //   2. sin veto     — no quedan patrones descansados con inventario
+    //   3. sin tope     — no hay inventario ni relajando el veto
+    //
+    // El veto cede ANTES que el tope a propósito: sin veto la sesión repite un
+    // patrón de anteayer pero sigue repartida, mientras que aflojar el tope
+    // primero daría 3 o 4 slots del único patrón descansado — justo la sesión
+    // monotemática que el tope existe para evitar.
+    const MODOS = [
+      { conVeto: true, conTope: true },
+      { conVeto: false, conTope: true },
+      { conVeto: false, conTope: false },
+    ];
+
+    for (const { conVeto, conTope } of MODOS) {
       let asignado = false;
 
       for (const cand of ranking) {
+        if (conVeto && cand.vetado) continue;
         if (conTope && asignadosPorPatron[cand.patron] >= params.maxSlotsPerPattern) continue;
 
         const opciones = candidatos(cand.patron, bloque);
@@ -438,6 +493,7 @@ function buildRecommendation(workouts, exercises, params, now) {
       }
 
       if (asignado) {
+        if (!conVeto) vetoRelajado = true;
         if (!conTope) topePatronRelajado = true;
         break;
       }
@@ -469,6 +525,7 @@ function buildRecommendation(workouts, exercises, params, now) {
       correctiveFactor: params.correctiveFactor,
       maxNew: params.maxNew,
       avoidLastSessions: params.avoidLastSessions,
+      vetoDays: params.vetoDays,
       maxSlotsPerPattern: params.maxSlotsPerPattern,
       slots: params.slots,
     },
@@ -485,6 +542,11 @@ function buildRecommendation(workouts, exercises, params, now) {
       cupoNovedadUsado: nuevosUsados,
       // true = algún slot tuvo que pasarse del tope por patrón para no quedar vacío.
       topePatronRelajado,
+      // Patrones de la última sesión, vetados por ser demasiado reciente.
+      patronesVetados: [...patronesVetados],
+      // true = no quedaban patrones descansados con inventario y hubo que usar
+      // uno vetado para no dejar el slot vacío.
+      vetoRelajado,
     },
     balanceActual: balanceBefore,
     recomendacion: {

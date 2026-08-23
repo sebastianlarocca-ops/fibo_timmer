@@ -992,7 +992,25 @@ function recNarrativa(data) {
     );
   }
 
-  // 2. Qué entra y por qué. El déficit es lo que ordena el reparto.
+  // 2. Qué quedó afuera por reciente. Va antes del reparto porque explica una
+  //    ausencia: sin esto, un patrón con déficit grande desaparece de la sesión
+  //    sin motivo visible y parece un error del motor.
+  const vetados = ctx.patronesVetados || [];
+  if (vetados.length) {
+    const dias = ctx.diasDesdeUltimoEntrenamiento;
+    const cuando =
+      dias === 0 ? "earlier today" : dias === 1 ? "yesterday" : `${dias} days ago`;
+    frases.push(
+      `${recEnumerar(vetados.map(recLabel))} ${vetados.length > 1 ? "sit" : "sits"} out — you trained ${vetados.length > 1 ? "them" : "it"} ${cuando}.`
+    );
+    if (ctx.vetoRelajado) {
+      frases.push(
+        `There weren't enough rested patterns to fill the session, so some come back anyway.`
+      );
+    }
+  }
+
+  // 3. Qué entra y por qué. El déficit es lo que ordena el reparto.
   const entran = [...slotsPorPatron.entries()].map(([patron, n]) => {
     const b = porPatron.get(patron) || {};
     return `${recLabel(patron)} at ${recPct(b.share)} (${n} slot${n > 1 ? "s" : ""})`;
@@ -1015,7 +1033,7 @@ function recNarrativa(data) {
     frases.push(`Today goes to ${recEnumerar(entran)}${cola}`);
   }
 
-  // 3. El correctivo, que se apaga solo al llegar al objetivo.
+  // 4. El correctivo, que se apaga solo al llegar al objetivo.
   const conCorrectivo = [...new Set(
     trabajo.filter((s) => s.porQue?.correctivoAplicado).map((s) => s.patron)
   )];
@@ -1025,14 +1043,14 @@ function recNarrativa(data) {
     );
   }
 
-  // 4. Descanso. Tras un parate la frescura deja de discriminar y decide el
+  // 5. Descanso. Tras un parate la frescura deja de discriminar y decide el
   //    balance solo — vale decirlo, porque cambia qué está mirando el motor.
   const dias = ctx.diasDesdeUltimoEntrenamiento;
   if (ctx.vueltaDeParate && dias !== null && dias !== undefined) {
     frases.push(`It's been ${dias} days since you trained, so everything is rested — this is balance alone, not recovery.`);
   }
 
-  // 5. Novedad.
+  // 6. Novedad.
   if (ctx.cupoNovedadUsado > 0) {
     frases.push(
       ctx.cupoNovedadUsado === 1
