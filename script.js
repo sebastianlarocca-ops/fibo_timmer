@@ -786,6 +786,92 @@ const REC_PATRON_LABEL = {
 };
 
 let _recCargando = false;
+let _recColapsado = false;
+
+/** Una línea con lo esencial: qué patrones toca y cuántos ejercicios propone. */
+function recResumenLinea(data) {
+  const core = data.recomendacion?.core || [];
+  const trabajo = data.recomendacion?.trabajo || [];
+  const total = core.length + trabajo.length;
+  if (!total) return "No suggestions";
+
+  const patrones = [...new Set(trabajo.map((s) => s.patron))].map(recLabel);
+  const cuenta = `${total} exercise${total > 1 ? "s" : ""}`;
+  return patrones.length ? `${patrones.join(" + ")} · ${cuenta}` : cuenta;
+}
+
+/** Colapsa el panel a su cabecera, o lo vuelve a abrir. */
+function recSetColapsado(colapsado) {
+  _recColapsado = colapsado;
+  const box = document.getElementById("recResult");
+  if (!box) return;
+
+  box.classList.toggle("rec-result--collapsed", colapsado);
+  const body = box.querySelector(".rec-body");
+  if (body) body.hidden = colapsado;
+  const toggle = box.querySelector(".rec-head__toggle");
+  if (toggle) toggle.setAttribute("aria-expanded", String(!colapsado));
+}
+
+/** Cierra el panel y deja el botón como estaba. */
+function recCerrar() {
+  const box = document.getElementById("recResult");
+  if (box) {
+    box.replaceChildren();
+    box.hidden = true;
+    box.classList.remove("rec-result--collapsed");
+  }
+  _recColapsado = false;
+  const btn = document.getElementById("suggestPlanBtn");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+/**
+ * Cabecera del panel: el resumen de una línea, el toggle de colapso y el cierre.
+ * Es lo único que queda visible cuando está colapsado, así que el resumen tiene
+ * que bastar para saber qué hay abajo sin abrirlo.
+ */
+function recHeader(resumen, { colapsable = true } = {}) {
+  const head = document.createElement("div");
+  head.className = "rec-head";
+
+  if (colapsable) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "rec-head__toggle";
+    toggle.setAttribute("aria-expanded", String(!_recColapsado));
+    toggle.setAttribute("aria-controls", "recBody");
+
+    const chevron = document.createElement("span");
+    chevron.className = "rec-head__chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "\u25BE";
+    toggle.appendChild(chevron);
+
+    const texto = document.createElement("span");
+    texto.className = "rec-head__summary";
+    texto.textContent = resumen;
+    toggle.appendChild(texto);
+
+    toggle.addEventListener("click", () => recSetColapsado(!_recColapsado));
+    head.appendChild(toggle);
+  } else {
+    const texto = document.createElement("span");
+    texto.className = "rec-head__summary rec-head__summary--static";
+    texto.textContent = resumen;
+    head.appendChild(texto);
+  }
+
+  const cerrar = document.createElement("button");
+  cerrar.type = "button";
+  cerrar.className = "rec-head__close";
+  cerrar.setAttribute("aria-label", "Dismiss suggestion");
+  cerrar.textContent = "\u00D7";
+  cerrar.addEventListener("click", recCerrar);
+  head.appendChild(cerrar);
+
+  return head;
+}
 
 /** "NEW" para los que nunca hiciste, "45D" para el resto. */
 function recMetaLabel(esNuevo, daysSinceLast) {
@@ -997,6 +1083,20 @@ function renderRecommendation(data) {
 
   box.replaceChildren();
   box.hidden = false;
+  // Sincronizar la clase con el estado: si se re-renderiza después de haber
+  // colapsado, la clase quedaría pegada y la flecha apuntaría de costado con el
+  // panel abierto.
+  box.classList.toggle("rec-result--collapsed", _recColapsado);
+  box.appendChild(recHeader(recResumenLinea(data)));
+
+  // Todo lo que no sea la cabecera vive acá adentro: colapsar es esconder este
+  // div, no re-renderizar, así que abrir y cerrar no vuelve a pegarle al server
+  // ni pierde el scroll.
+  const body = document.createElement("div");
+  body.className = "rec-body";
+  body.id = "recBody";
+  body.hidden = _recColapsado;
+  box.appendChild(body);
 
   const frases = recNarrativa(data);
   if (frases.length) {
@@ -1008,11 +1108,11 @@ function renderRecommendation(data) {
       p.textContent = texto;
       why.appendChild(p);
     });
-    box.appendChild(why);
+    body.appendChild(why);
   }
 
   const chart = recBalanceChart(data);
-  if (chart) box.appendChild(chart);
+  if (chart) body.appendChild(chart);
 
   // Avisos que cambian cuánto confiar en la recomendación. Sólo aparecen cuando
   // aplican, así que en el caso normal el panel queda limpio.
@@ -1034,7 +1134,7 @@ function renderRecommendation(data) {
     const el = document.createElement("p");
     el.className = "rec-note";
     el.textContent = texto;
-    box.appendChild(el);
+    body.appendChild(el);
   });
 
   const core = data.recomendacion?.core || [];
@@ -1044,7 +1144,7 @@ function renderRecommendation(data) {
     const vacio = document.createElement("p");
     vacio.className = "rec-note";
     vacio.textContent = "No suggestions right now — try adding exercises to your catalog.";
-    box.appendChild(vacio);
+    body.appendChild(vacio);
     return;
   }
 
@@ -1070,11 +1170,11 @@ function renderRecommendation(data) {
     const head = document.createElement("div");
     head.className = "rec-group";
     head.textContent = label;
-    box.appendChild(head);
+    body.appendChild(head);
 
     slots.forEach((slot) => {
       yaListados.add(clave(slot.ejercicio));
-      box.appendChild(
+      body.appendChild(
         recRow({
           name: slot.ejercicio,
           bloque,
@@ -1092,7 +1192,7 @@ function renderRecommendation(data) {
       (slot.alternativas || []).forEach((alt) => {
         if (yaListados.has(clave(alt.name))) return;
         yaListados.add(clave(alt.name));
-        box.appendChild(
+        body.appendChild(
           recRow({
             name: alt.name,
             bloque,
@@ -1112,8 +1212,12 @@ function recShowMessage(texto) {
   const box = document.getElementById("recResult");
   if (!box) return;
   box.replaceChildren();
+  box.classList.remove("rec-result--collapsed");
+  // Sin colapsar: un mensaje de una línea no tiene nada que esconder, pero sí
+  // hay que poder sacárselo de encima.
+  box.appendChild(recHeader("Suggestion", { colapsable: false }));
   const p = document.createElement("p");
-  p.className = "rec-note";
+  p.className = "rec-note rec-note--alone";
   p.textContent = texto;
   box.appendChild(p);
   box.hidden = false;
@@ -1124,6 +1228,9 @@ async function fetchRecommendation() {
   if (_recCargando) return;
 
   _recCargando = true;
+  // Un pedido nuevo siempre abre expandido: si quedó colapsado de la vez
+  // anterior, el resultado nuevo pasaría desapercibido.
+  _recColapsado = false;
   if (btn) {
     btn.disabled = true;
     btn.textContent = "Thinking…";

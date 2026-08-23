@@ -259,6 +259,95 @@ h1 {
   background: var(--surface);
 }
 
+/* ── Cabecera: resumen de una línea, colapsar y cerrar ───────────
+   Colapsado, esta barra es todo lo que queda del panel. */
+.rec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-head__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rec-head__toggle:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.rec-head__chevron {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--work);
+  transition: transform 0.18s ease;
+}
+.rec-result--collapsed .rec-head__chevron { transform: rotate(-90deg); }
+
+.rec-head__summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-num);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--work);
+}
+.rec-head__summary--static { padding: 2px 0; }
+
+.rec-head__close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg-mute);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rec-head__close:hover { background: var(--surface-2); color: var(--fg); }
+.rec-head__close:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: 1px;
+}
+
+/* Colapsado el panel es sólo la barra: sin el padding de abajo queda apretado
+   contra el borde y se lee como una fila, no como una caja vacía. */
+.rec-result--collapsed { padding-bottom: 10px; }
+
+.rec-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.rec-note--alone { margin: 10px 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-head__chevron { transition: none; }
+}
+
 .rec-why {
   margin: 0 0 12px;
 }
@@ -279,6 +368,7 @@ h1 {
   padding: 10px 0 0;
   border-top: 1px solid rgba(255,255,255,0.06);
 }
+.rec-why + .rec-balance { margin-top: 2px; }
 
 .rec-bal {
   display: flex;
