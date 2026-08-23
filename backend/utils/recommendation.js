@@ -45,9 +45,17 @@
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-// Los 4 patrones que compiten por los slots de bodyweight/overload. `core` queda
+// Los patrones que compiten por los slots de bodyweight/overload. `core` queda
 // afuera: tiene bloque propio y aparece en todas las sesiones, así que no compite.
-const PATRONES_BALANCE = ["empuje", "traccion", "rodilla_dominante", "cadera_dominante"];
+// `empuje` tampoco está: se partió en horizontal y vertical, y un documento que
+// todavía lo tenga cuenta como sin clasificar hasta que se migre.
+const PATRONES_BALANCE = [
+  "empuje_horizontal",
+  "empuje_vertical",
+  "traccion",
+  "rodilla_dominante",
+  "cadera_dominante",
+];
 
 const DEFAULTS = {
   windowSessions: 12,

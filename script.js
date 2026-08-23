@@ -778,11 +778,13 @@ function fibonacciResetUi() {
  */
 
 const REC_PATRON_LABEL = {
-  empuje: "Push",
+  empuje_horizontal: "Push H",
+  empuje_vertical: "Push V",
   traccion: "Pull",
   rodilla_dominante: "Knee",
   cadera_dominante: "Hip",
   core: "Core",
+  empuje: "Push", // legado: sólo aparece si quedó algún documento sin migrar
 };
 
 let _recCargando = false;
@@ -2413,13 +2415,22 @@ function computeDashStats(workouts) {
 
 // Orden fijo: las dos columnas (BD y OV) quedan alineadas fila a fila, así se
 // comparan de un vistazo. El patrón más pesado se resalta en vez de reordenarse.
-const PATRON_ORDER  = ["empuje", "traccion", "rodilla_dominante", "cadera_dominante", "core"];
+const PATRON_ORDER  = [
+  "empuje_horizontal",
+  "empuje_vertical",
+  "traccion",
+  "rodilla_dominante",
+  "cadera_dominante",
+  "core",
+];
 const PATRON_LABELS = {
-  empuje:            "Push",
+  empuje_horizontal: "Push H",
+  empuje_vertical:   "Push V",
   traccion:          "Pull",
   rodilla_dominante: "Knee",
   cadera_dominante:  "Hip",
   core:              "Core",
+  empuje:            "Push", // legado, ver PATRONES en el modelo del backend
 };
 // Sólo BD y OV: el bloque de core es 100% patrón core por definición.
 const PATRON_BLOCKS = [
