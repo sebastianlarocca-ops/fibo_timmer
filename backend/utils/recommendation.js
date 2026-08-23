@@ -23,9 +23,13 @@
  *                      no hay que acordarse de desactivarlo.
  *
  *  4. Asignación     — los 4 slots no-core se asignan de a uno, RE-SCOREANDO después
- *                      de cada asignación. Así un patrón muy atrasado se lleva dos
- *                      slots, y cuando todo está parejo la sesión cubre los 4
- *                      patrones distintos por sí sola.
+ *                      de cada asignación, con un tope de `maxSlotsPerPattern`
+ *                      slots por patrón. El re-scoreo solo no alcanza: si el
+ *                      resto de los patrones se entrenó recién, su frescura es 0
+ *                      y no tienen con qué competir, así que el más atrasado se
+ *                      lleva la sesión entera. El tope es lo que garantiza que
+ *                      una sesión toque más de un patrón; el re-scoreo decide
+ *                      cuáles y en qué proporción.
  *
  *  5. Ejercicios     — primero los que nunca hiciste (tope `maxNew` por sesión para
  *                      que una tanda de altas no te deje una sesión entera de
@@ -48,6 +52,7 @@ const DEFAULTS = {
   correctiveFactor: 1.5,
   maxNew: 2,
   avoidLastSessions: 1,
+  maxSlotsPerPattern: 2,
   slotsCore: 1,
   slotsBodyweight: 2,
   slotsOverload: 2,
@@ -91,6 +96,7 @@ function readParams(query) {
     correctiveFactor: num(q.correctiveFactor, DEFAULTS.correctiveFactor, { min: 1, max: 4 }),
     maxNew: num(q.maxNew, DEFAULTS.maxNew, { min: 0, max: 5 }),
     avoidLastSessions: num(q.avoidLastSessions, DEFAULTS.avoidLastSessions, { min: 0, max: 5 }),
+    maxSlotsPerPattern: num(q.maxSlotsPerPattern, DEFAULTS.maxSlotsPerPattern, { min: 1, max: 5 }),
     slots: {
       core: num(q.slotsCore, DEFAULTS.slotsCore, { min: 0, max: 3 }),
       bodyweight: num(q.slotsBodyweight, DEFAULTS.slotsBodyweight, { min: 0, max: 5 }),
@@ -247,6 +253,11 @@ function buildRecommendation(workouts, exercises, params, now) {
   const usadosEnEstaSesion = new Set();
   let nuevosUsados = 0;
 
+  // Slots que se llevó cada patrón EN ESTA SESIÓN — es contra esto que corre el
+  // tope, no contra `trabajo`, que arrastra el conteo de toda la ventana.
+  const asignadosPorPatron = Object.fromEntries(PATRONES_BALANCE.map((p) => [p, 0]));
+  let topePatronRelajado = false;
+
   // Copia mutable de la frescura. Cuando un patrón se lleva un slot pasa a
   // contar como trabajado HOY para las decisiones que siguen dentro de la misma
   // sesión. Sin esto un patrón descansado gana todos los slots seguidos: el
@@ -357,46 +368,68 @@ function buildRecommendation(workouts, exercises, params, now) {
       scorePattern(p, trabajo, frescura, params)
     ).sort((a, b) => b.score - a.score);
 
-    for (const cand of ranking) {
-      const opciones = candidatos(cand.patron, bloque);
-      if (!opciones.length) continue; // sin inventario para ese patrón en ese bloque
+    // Dos pasadas. La primera respeta el tope de slots por patrón; la segunda lo
+    // ignora y sólo corre si la primera no pudo asignar nada. Sin ese fallback un
+    // tope bajo dejaría slots vacíos cada vez que los patrones todavía habilitados
+    // no tienen inventario en el bloque — y un ejercicio repetido es mejor que un
+    // hueco. Cuando pasa queda registrado en `contexto.topePatronRelajado`.
+    for (const conTope of [true, false]) {
+      let asignado = false;
 
-      const pick = opciones[0];
-      usadosEnEstaSesion.add(normalize(pick.name));
-      if (pick.esNuevo) nuevosUsados += 1;
-      trabajo[cand.patron] += 1;
-      frescura[cand.patron] = 0; // ya se trabaja en esta sesión
+      for (const cand of ranking) {
+        if (conTope && asignadosPorPatron[cand.patron] >= params.maxSlotsPerPattern) continue;
 
-      // Un complejo cubre más de un patrón: los otros también quedan trabajados.
-      (byName.get(normalize(pick.name))?.patrones || []).forEach((p) => {
-        if (p !== cand.patron && p in frescura) {
-          frescura[p] = 0;
-          trabajo[p] += 1;
-        }
-      });
+        const opciones = candidatos(cand.patron, bloque);
+        if (!opciones.length) continue; // sin inventario para ese patrón en ese bloque
 
-      elegidos.push({
-        slot: i + 1,
-        bloque,
-        patron: cand.patron,
-        ejercicio: pick.name,
-        esNuevo: pick.esNuevo,
-        daysSinceLast: pick.daysSinceLast,
-        porQue: {
-          score: cand.score,
-          shareEnVentana: cand.share,
-          objetivo: cand.target,
-          deficit: cand.deficit,
-          correctivoAplicado: cand.corrective,
-          diasSinElPatron: cand.daysSinceLast,
-        },
-        alternativas: opciones.slice(1, 1 + params.alternatives).map((o) => ({
-          name: o.name,
-          esNuevo: o.esNuevo,
-          daysSinceLast: o.daysSinceLast,
-        })),
-      });
-      return;
+        const pick = opciones[0];
+        usadosEnEstaSesion.add(normalize(pick.name));
+        if (pick.esNuevo) nuevosUsados += 1;
+        trabajo[cand.patron] += 1;
+        asignadosPorPatron[cand.patron] += 1;
+        frescura[cand.patron] = 0; // ya se trabaja en esta sesión
+
+        // Un complejo cubre más de un patrón: los otros también quedan trabajados.
+        // Suman al balance y les resetea la frescura, pero NO consumen su cupo del
+        // tope: el slot se asignó por `cand.patron`, y descontárselo a los demás
+        // dejaría a un catálogo con muchos complejos sin patrones habilitados.
+        (byName.get(normalize(pick.name))?.patrones || []).forEach((p) => {
+          if (p !== cand.patron && p in frescura) {
+            frescura[p] = 0;
+            trabajo[p] += 1;
+          }
+        });
+
+        elegidos.push({
+          slot: i + 1,
+          bloque,
+          patron: cand.patron,
+          ejercicio: pick.name,
+          esNuevo: pick.esNuevo,
+          daysSinceLast: pick.daysSinceLast,
+          porQue: {
+            score: cand.score,
+            shareEnVentana: cand.share,
+            objetivo: cand.target,
+            deficit: cand.deficit,
+            correctivoAplicado: cand.corrective,
+            diasSinElPatron: cand.daysSinceLast,
+          },
+          alternativas: opciones.slice(1, 1 + params.alternatives).map((o) => ({
+            name: o.name,
+            esNuevo: o.esNuevo,
+            daysSinceLast: o.daysSinceLast,
+          })),
+        });
+
+        asignado = true;
+        break;
+      }
+
+      if (asignado) {
+        if (!conTope) topePatronRelajado = true;
+        break;
+      }
     }
   });
 
@@ -425,6 +458,7 @@ function buildRecommendation(workouts, exercises, params, now) {
       correctiveFactor: params.correctiveFactor,
       maxNew: params.maxNew,
       avoidLastSessions: params.avoidLastSessions,
+      maxSlotsPerPattern: params.maxSlotsPerPattern,
       slots: params.slots,
     },
     contexto: {
@@ -438,6 +472,8 @@ function buildRecommendation(workouts, exercises, params, now) {
       vueltaDeParate: diasDesdeUltimo !== null && diasDesdeUltimo >= params.recoveryDays,
       ejerciciosSinClasificar: [...sinClasificar],
       cupoNovedadUsado: nuevosUsados,
+      // true = algún slot tuvo que pasarse del tope por patrón para no quedar vacío.
+      topePatronRelajado,
     },
     balanceActual: balanceBefore,
     recomendacion: {

@@ -48,6 +48,17 @@
             <span class="session-plan-bar__summary" id="sessionPlanSummary">0 EXERCISES · 16 MIN</span>
           </div>
 
+          <!-- Recomendación por balance de patrones. Las filas que pinta
+               renderRecommendation() se agregan al plan con un click, igual que
+               las de la pestaña List. -->
+          <div class="rec">
+            <button type="button" id="suggestPlanBtn" class="rec-btn"
+              aria-expanded="false" aria-controls="recResult">
+              Suggest session
+            </button>
+            <div id="recResult" class="rec-result" hidden aria-live="polite"></div>
+          </div>
+
           <div class="fib-exercise-fields">
 
             <div class="fib-exercise-block" data-fib-block="core">
@@ -361,9 +372,12 @@
           aria-label="Filter by movement pattern"></div>
         <div id="exList" class="ex-list" aria-live="polite"></div>
         <p id="exMessage" class="dash-message" hidden aria-live="polite"></p>
-        <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>
       </div>
     </div><!-- /view-exercises -->
+
+    <!-- Vive fuera de las vistas y es position:fixed: adentro de #view-exercises
+         quedaba tapado por el [hidden] de la vista al usarlo desde el timer. -->
+    <div id="exToast" class="ex-toast" hidden role="status" aria-live="polite"></div>
 
     <script src="script.js"></script>
   </body>

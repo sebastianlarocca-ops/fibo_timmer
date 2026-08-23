@@ -765,6 +765,254 @@ function fibonacciResetUi() {
   fibonacciTimer.reset();
 }
 
+/* ── Recomendación por balance de patrones ────────────────────────────────
+ *
+ * Un GET a /api/analytics/recommendation y sus ejercicios pintados como filas
+ * clickeables. Cada fila usa addExerciseFromList(), la misma función que las
+ * filas de la pestaña List: chequea duplicados, resuelve el bloque por
+ * modalidad, postea a la DB y muestra el toast. Acá no se replica nada de eso.
+ *
+ * El endpoint es determinístico: dos clicks seguidos devuelven lo mismo. Por eso
+ * cada slot muestra también sus alternativas — es la única variedad disponible
+ * sin meterle azar al motor, que lo volvería imposible de auditar.
+ */
+
+const REC_PATRON_LABEL = {
+  empuje: "Push",
+  traccion: "Pull",
+  rodilla_dominante: "Knee",
+  cadera_dominante: "Hip",
+  core: "Core",
+};
+
+let _recCargando = false;
+
+/** "NEW" para los que nunca hiciste, "45D" para el resto. */
+function recMetaLabel(esNuevo, daysSinceLast) {
+  if (esNuevo) return "NEW";
+  if (daysSinceLast === null || daysSinceLast === undefined) return "";
+  if (daysSinceLast === 0) return "TODAY";
+  return `${daysSinceLast}D`;
+}
+
+/**
+ * Una fila clickeable. `bloque` es la modalidad: el motor filtra los candidatos
+ * por `modalidad === bloque`, así que son lo mismo y no hace falta ir al catálogo.
+ */
+function recRow({ name, bloque, patron, esNuevo, daysSinceLast, esAlternativa }) {
+  const row = document.createElement("div");
+  row.className = "rec-row" + (esAlternativa ? " rec-row--alt" : "");
+  row.setAttribute("role", "button");
+  row.tabIndex = 0;
+  row.setAttribute("aria-label", `Add ${name} to ${bloque}`);
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "rec-row__name";
+  nameEl.textContent = name; // textContent, no innerHTML: es input del usuario
+  row.appendChild(nameEl);
+
+  if (patron) {
+    const chip = document.createElement("span");
+    chip.className = "rec-row__patron";
+    chip.textContent = REC_PATRON_LABEL[patron] || patron;
+    row.appendChild(chip);
+  }
+
+  const meta = recMetaLabel(esNuevo, daysSinceLast);
+  if (meta) {
+    const metaEl = document.createElement("span");
+    metaEl.className = "rec-row__meta" + (esNuevo ? " rec-row__meta--new" : "");
+    metaEl.textContent = meta;
+    row.appendChild(metaEl);
+  }
+
+  const add = () => addExerciseFromList({ name, modalidad: bloque }, row);
+  row.addEventListener("click", add);
+  row.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      add();
+    }
+  });
+
+  return row;
+}
+
+/**
+ * Una línea explicando el criterio: el patrón más pasado de rosca y el que la
+ * sesión viene a levantar. Sin esto el botón es una caja negra.
+ */
+function recPorQue(data) {
+  const balance = [...(data.balanceActual || [])].sort((a, b) => b.share - a.share);
+  if (!balance.length) return "";
+
+  const pct = (n) => `${Math.round(n * 100)}%`;
+  const sobrante = balance[0];
+  const patrones = [...new Set((data.recomendacion?.trabajo || []).map((s) => s.patron))]
+    .map((p) => REC_PATRON_LABEL[p] || p);
+
+  if (!patrones.length) return "";
+
+  const objetivo = pct(sobrante.target ?? 0.25);
+  return `${patrones.join(" + ")} today — ${REC_PATRON_LABEL[sobrante.patron] || sobrante.patron} is at ${pct(sobrante.share)} of your last ${data.contexto?.sesionesEnVentana ?? 12} sessions vs a ${objetivo} target.`;
+}
+
+/** Pinta el resultado: la línea de criterio y las filas agrupadas por bloque. */
+function renderRecommendation(data) {
+  const box = document.getElementById("recResult");
+  if (!box) return;
+
+  box.replaceChildren();
+  box.hidden = false;
+
+  const porQue = recPorQue(data);
+  if (porQue) {
+    const p = document.createElement("p");
+    p.className = "rec-why";
+    p.textContent = porQue;
+    box.appendChild(p);
+  }
+
+  // Avisos que cambian cuánto confiar en la recomendación. Sólo aparecen cuando
+  // aplican, así que en el caso normal el panel queda limpio.
+  const avisos = [];
+  if (data.contexto?.ventanaDegradada) {
+    avisos.push("Not much recent history — using older sessions.");
+  }
+  if (data.contexto?.topePatronRelajado) {
+    avisos.push("Not enough exercises to spread the session further.");
+  }
+  const sinClasificar = data.contexto?.ejerciciosSinClasificar || [];
+  if (sinClasificar.length) {
+    avisos.push(
+      `${sinClasificar.length} exercise${sinClasificar.length > 1 ? "s" : ""} without a pattern ` +
+      `(${sinClasificar.slice(0, 3).join(", ")}${sinClasificar.length > 3 ? "…" : ""}) — set it in List to sharpen this.`
+    );
+  }
+  avisos.forEach((texto) => {
+    const el = document.createElement("p");
+    el.className = "rec-note";
+    el.textContent = texto;
+    box.appendChild(el);
+  });
+
+  const core = data.recomendacion?.core || [];
+  const trabajo = data.recomendacion?.trabajo || [];
+
+  if (!core.length && !trabajo.length) {
+    const vacio = document.createElement("p");
+    vacio.className = "rec-note";
+    vacio.textContent = "No suggestions right now — try adding exercises to your catalog.";
+    box.appendChild(vacio);
+    return;
+  }
+
+  // Agrupado por bloque, en el mismo orden que los bloques de abajo. No se
+  // asume 1+2+2: si un patrón se queda sin inventario en un bloque, ese slot no
+  // viene, y el grupo vacío simplemente no se dibuja.
+  const grupos = [
+    { bloque: "core", label: "Core", slots: core.map((c) => ({ ...c, bloque: "core" })) },
+    { bloque: "bodyweight", label: "Bodyweight", slots: trabajo.filter((s) => s.bloque === "bodyweight") },
+    { bloque: "overload", label: "Overload", slots: trabajo.filter((s) => s.bloque === "overload") },
+  ];
+
+  // Las alternativas se calculan por slot, así que dos slots del mismo patrón
+  // ofrecen la misma banca — y el elegido de un slot suele ser alternativa del
+  // anterior. Sin este filtro el panel repite nombres y no se entiende cuál es
+  // cuál. Los elegidos siempre se pintan; las alternativas, sólo si son nuevas.
+  const yaListados = new Set();
+  const clave = (name) => String(name).trim().toLowerCase();
+
+  grupos.forEach(({ bloque, label, slots }) => {
+    if (!slots.length) return;
+
+    const head = document.createElement("div");
+    head.className = "rec-group";
+    head.textContent = label;
+    box.appendChild(head);
+
+    slots.forEach((slot) => {
+      yaListados.add(clave(slot.ejercicio));
+      box.appendChild(
+        recRow({
+          name: slot.ejercicio,
+          bloque,
+          patron: slot.patron || (slot.patrones || [])[0],
+          esNuevo: slot.esNuevo,
+          daysSinceLast: slot.daysSinceLast,
+        })
+      );
+    });
+
+    // Las alternativas van después de los elegidos del bloque, no intercaladas:
+    // así los slots de la sesión se leen de corrido y las opciones de recambio
+    // quedan juntas abajo.
+    slots.forEach((slot) => {
+      (slot.alternativas || []).forEach((alt) => {
+        if (yaListados.has(clave(alt.name))) return;
+        yaListados.add(clave(alt.name));
+        box.appendChild(
+          recRow({
+            name: alt.name,
+            bloque,
+            patron: null,
+            esNuevo: alt.esNuevo,
+            daysSinceLast: alt.daysSinceLast,
+            esAlternativa: true,
+          })
+        );
+      });
+    });
+  });
+}
+
+/** Muestra un mensaje en el panel sin romper el resto de la pantalla. */
+function recShowMessage(texto) {
+  const box = document.getElementById("recResult");
+  if (!box) return;
+  box.replaceChildren();
+  const p = document.createElement("p");
+  p.className = "rec-note";
+  p.textContent = texto;
+  box.appendChild(p);
+  box.hidden = false;
+}
+
+async function fetchRecommendation() {
+  const btn = document.getElementById("suggestPlanBtn");
+  if (_recCargando) return;
+
+  _recCargando = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Thinking…";
+    btn.setAttribute("aria-expanded", "true");
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/analytics/recommendation`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    renderRecommendation(await res.json());
+  } catch (err) {
+    // Igual que el resto de la app: un fallo de red no rompe la pantalla, el
+    // plan se sigue armando a mano.
+    console.warn("[recommendation] no se pudo obtener:", err.message);
+    recShowMessage("Couldn't load the suggestion. Check your connection and try again.");
+  } finally {
+    _recCargando = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Suggest session";
+    }
+  }
+}
+
+function initSuggestPlan() {
+  const btn = document.getElementById("suggestPlanBtn");
+  if (!btn) return;
+  btn.addEventListener("click", fetchRecommendation);
+}
+
 function initFibExerciseListsUi() {
   loadFibExerciseListsFromStorage();
   FIB_BLOCK_TYPES.forEach((type) => renderExerciseList(type));
@@ -3461,6 +3709,7 @@ function bootstrap() {
   initExercisesModalidadFilter();
   initExercisesPatronFilter();
   initExerciseAddForm();
+  initSuggestPlan();
 
   // 2. Primer render
   fibonacciResetUi();

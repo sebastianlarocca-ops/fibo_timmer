@@ -217,6 +217,143 @@ h1 {
   color: var(--work);
 }
 
+/* ── Recomendación por balance de patrones ──────────────────────
+   El botón vive bajo la session-plan-bar y despliega filas que se suman al
+   plan con un click, igual que las de la pestaña List. */
+.rec {
+  margin-bottom: 1.25rem;
+}
+
+.rec-btn {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid rgba(255,106,44,0.45);
+  border-radius: 10px;
+  background: rgba(255,106,44,0.08);
+  color: var(--work);
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.rec-btn:hover:not(:disabled) { background: rgba(255,106,44,0.16); }
+.rec-btn:active:not(:disabled) { background: rgba(255,106,44,0.24); }
+.rec-btn:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: 2px;
+}
+.rec-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.rec-result {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.rec-why {
+  margin: 0 0 10px;
+  color: var(--fg-mute);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.rec-note {
+  margin: 0 0 8px;
+  color: var(--fg-mute);
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.rec-group {
+  margin: 12px 0 4px;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.rec-group:first-child { margin-top: 0; }
+
+.rec-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease;
+}
+.rec-row:hover { background: var(--surface-2); }
+.rec-row:active { background: rgba(255,106,44,0.10); }
+.rec-row:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: -2px;
+}
+
+/* Las alternativas son opciones de descarte del mismo slot: se leen como
+   secundarias pero se agregan igual que la principal. */
+.rec-row--alt {
+  padding-left: 22px;
+  opacity: 0.62;
+}
+.rec-row--alt:hover { opacity: 1; }
+.rec-row--alt .rec-row__name { font-weight: 500; font-size: 13px; }
+
+.rec-row__name {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.rec-row__patron {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--fg-mute);
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.rec-row__meta {
+  flex-shrink: 0;
+  min-width: 38px;
+  text-align: right;
+  color: var(--fg-mute);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.rec-row__meta--new { color: var(--rest); }
+
+/* addExerciseFromList() marca la fila agregada con .ex-row--added; las filas de
+   List son <tr> y animan su <td>, acá el fondo va en la fila misma. */
+.rec-row.ex-row--added { animation: ex-added-flash 0.6s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-row.ex-row--added { animation: none; }
+}
+
 /* ── Exercise blocks ─────────────────────────────────────────── */
 .fib-exercise-setup {
   margin-bottom: 1.5rem;
