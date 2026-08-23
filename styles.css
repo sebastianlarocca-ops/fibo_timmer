@@ -474,13 +474,20 @@ h1 {
 }
 
 /* Las alternativas son opciones de descarte del mismo slot: se leen como
-   secundarias pero se agregan igual que la principal. */
+   secundarias pero se agregan igual que la principal.
+   Se atenúan por color y NO con opacity: opacity crea un contexto de apilado y
+   arrastra a todo el subárbol, así que dejaba el ▶ del video medio borrado sin
+   forma de devolvérselo desde el hijo. */
 .rec-row--alt {
   padding-left: 22px;
-  opacity: 0.62;
 }
-.rec-row--alt:hover { opacity: 1; }
-.rec-row--alt .rec-row__name { font-weight: 500; font-size: 13px; }
+.rec-row--alt .rec-row__name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--fg-mute);
+}
+.rec-row--alt .rec-row__meta { color: var(--fg-dim); }
+.rec-row--alt:hover .rec-row__name { color: var(--fg); }
 
 .rec-row__name {
   flex: 1;
@@ -490,6 +497,31 @@ h1 {
   font-size: 14px;
   text-transform: capitalize;
   overflow-wrap: anywhere;
+}
+
+/* Sólo aparece si el ejercicio tiene video. Mismo lenguaje que el ▶ de List,
+   más chico porque acá compite con el chip de patrón y la antigüedad. */
+.rec-row__video {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255,106,44,0.35);
+  border-radius: 999px;
+  background: rgba(255,106,44,0.12);
+  color: var(--work);
+  font-size: 9px;
+  line-height: 1;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease;
+}
+.rec-row__video:hover { background: rgba(255,106,44,0.26); }
+.rec-row__video:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: 2px;
 }
 
 .rec-row__patron {

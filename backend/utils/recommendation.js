@@ -282,7 +282,13 @@ function buildRecommendation(workouts, exercises, params, now) {
         const dias = ex.lastPerformed
           ? Math.floor((now - new Date(ex.lastPerformed).getTime()) / DIA_MS)
           : null;
-        return { name: ex.name, esNuevo, daysSinceLast: dias, daysPerformed: ex.daysPerformed || 0 };
+        return {
+          name: ex.name,
+          esNuevo,
+          daysSinceLast: dias,
+          daysPerformed: ex.daysPerformed || 0,
+          link: ex.link || null,
+        };
       })
       .sort((a, b) => {
         // Los nunca hechos primero — salvo que ya se haya agotado el cupo de
@@ -313,6 +319,7 @@ function buildRecommendation(workouts, exercises, params, now) {
         name: ex.name,
         esNuevo: (ex.daysPerformed || 0) === 0,
         patrones: ex.patrones || [],
+        link: ex.link || null,
         daysSinceLast: ex.lastPerformed
           ? Math.floor((now - new Date(ex.lastPerformed).getTime()) / DIA_MS)
           : null,
@@ -347,10 +354,12 @@ function buildRecommendation(workouts, exercises, params, now) {
       patrones: pick.patrones,
       esNuevo: pick.esNuevo,
       daysSinceLast: pick.daysSinceLast,
+      link: pick.link,
       alternativas: opciones.slice(1, 1 + params.alternatives).map((o) => ({
         name: o.name,
         esNuevo: o.esNuevo,
         daysSinceLast: o.daysSinceLast,
+        link: o.link,
       })),
     });
   }
@@ -407,6 +416,7 @@ function buildRecommendation(workouts, exercises, params, now) {
           ejercicio: pick.name,
           esNuevo: pick.esNuevo,
           daysSinceLast: pick.daysSinceLast,
+          link: pick.link,
           porQue: {
             score: cand.score,
             shareEnVentana: cand.share,
@@ -419,6 +429,7 @@ function buildRecommendation(workouts, exercises, params, now) {
             name: o.name,
             esNuevo: o.esNuevo,
             daysSinceLast: o.daysSinceLast,
+            link: o.link,
           })),
         });
 

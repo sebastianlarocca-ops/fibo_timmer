@@ -885,7 +885,7 @@ function recMetaLabel(esNuevo, daysSinceLast) {
  * Una fila clickeable. `bloque` es la modalidad: el motor filtra los candidatos
  * por `modalidad === bloque`, así que son lo mismo y no hace falta ir al catálogo.
  */
-function recRow({ name, bloque, patron, esNuevo, daysSinceLast, esAlternativa }) {
+function recRow({ name, bloque, patron, esNuevo, daysSinceLast, link, esAlternativa }) {
   const row = document.createElement("div");
   row.className = "rec-row" + (esAlternativa ? " rec-row--alt" : "");
   row.setAttribute("role", "button");
@@ -896,6 +896,22 @@ function recRow({ name, bloque, patron, esNuevo, daysSinceLast, esAlternativa })
   nameEl.className = "rec-row__name";
   nameEl.textContent = name; // textContent, no innerHTML: es input del usuario
   row.appendChild(nameEl);
+
+  // El ▶ sólo aparece si el ejercicio tiene video cargado. Va antes del chip para
+  // que quede en la misma columna en todas las filas que lo tengan.
+  if (link) {
+    const video = document.createElement("a");
+    video.className = "rec-row__video";
+    video.href = link;
+    video.target = "_blank";
+    video.rel = "noopener noreferrer";
+    video.title = link;
+    video.setAttribute("aria-label", `Open video for ${name}`);
+    video.textContent = "\u25B6";
+    // Sin esto, abrir el video también sumaría el ejercicio al plan.
+    video.addEventListener("click", (e) => e.stopPropagation());
+    row.appendChild(video);
+  }
 
   if (patron) {
     const chip = document.createElement("span");
@@ -912,12 +928,18 @@ function recRow({ name, bloque, patron, esNuevo, daysSinceLast, esAlternativa })
     row.appendChild(metaEl);
   }
 
-  const add = () => addExerciseFromList({ name, modalidad: bloque }, row);
+  const add = (e) => {
+    // El ▶ es un <a> adentro de una fila clickeable: mismo criterio que las
+    // filas de List, que excluyen su celda de link del alta.
+    if (e && e.target && e.target.closest && e.target.closest(".rec-row__video")) return;
+    addExerciseFromList({ name, modalidad: bloque }, row);
+  };
   row.addEventListener("click", add);
   row.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
+      if (e.target && e.target.closest && e.target.closest(".rec-row__video")) return;
       e.preventDefault();
-      add();
+      add(e);
     }
   });
 
@@ -1181,6 +1203,7 @@ function renderRecommendation(data) {
           patron: slot.patron || (slot.patrones || [])[0],
           esNuevo: slot.esNuevo,
           daysSinceLast: slot.daysSinceLast,
+          link: slot.link,
         })
       );
     });
@@ -1199,6 +1222,7 @@ function renderRecommendation(data) {
             patron: null,
             esNuevo: alt.esNuevo,
             daysSinceLast: alt.daysSinceLast,
+            link: alt.link,
             esAlternativa: true,
           })
         );
