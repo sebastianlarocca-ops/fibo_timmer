@@ -486,7 +486,10 @@ h1 {
   font-size: 13px;
   color: var(--fg-mute);
 }
-.rec-row--alt .rec-row__meta { color: var(--fg-dim); }
+/* Sólo la antigüedad se atenúa: el badge NEW tiene menos especificidad que este
+   selector, así que sin el :not() las alternativas nuevas perdían el verde y
+   quedaban distintas de las elegidas. */
+.rec-row--alt .rec-row__meta:not(.rec-row__meta--new) { color: var(--fg-dim); }
 .rec-row--alt:hover .rec-row__name { color: var(--fg); }
 
 .rec-row__name {
