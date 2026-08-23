@@ -260,10 +260,91 @@ h1 {
 }
 
 .rec-why {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
+}
+
+.rec-why__line {
+  margin: 0 0 6px;
   color: var(--fg-mute);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.rec-why__line:first-child { color: var(--fg); }
+.rec-why__line:last-child { margin-bottom: 0; }
+
+/* ── Balance por patrón, en barras ──────────────────────────────
+   La misma info que la prosa de arriba, pero de un vistazo. */
+.rec-balance {
+  margin: 0 0 14px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.rec-bal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.rec-bal__name {
+  flex: 0 0 42px;
+  font-family: var(--font-num);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.rec-bal__track {
+  position: relative;
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.rec-bal__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fg-dim);
+}
+
+/* La marca del objetivo. Va adentro del track (que tiene overflow:hidden para
+   recortar el redondeo del fill) y por encima de él, para que se siga viendo
+   cuando el patrón se pasó del objetivo y la barra la tapa. */
+.rec-bal__target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 2px;
+  background: rgba(255,255,255,0.75);
+}
+
+.rec-bal__pct {
+  flex: 0 0 30px;
+  text-align: right;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-mute);
+}
+
+/* Los patrones que entran hoy: el resto queda apagado a propósito, así se ve
+   de un vistazo qué eligió el motor y contra qué. */
+.rec-bal--in .rec-bal__name,
+.rec-bal--in .rec-bal__pct { color: var(--rest); }
+.rec-bal--in .rec-bal__fill { background: var(--rest); }
+
+.rec-balance__foot {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--fg-dim);
 }
 
 .rec-note {

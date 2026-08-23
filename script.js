@@ -838,23 +838,156 @@ function recRow({ name, bloque, patron, esNuevo, daysSinceLast, esAlternativa })
   return row;
 }
 
+const recPct = (n) => `${Math.round((n || 0) * 100)}%`;
+const recLabel = (p) => REC_PATRON_LABEL[p] || p;
+
+/** "Hip and Pull" / "Hip, Pull and Push" — enumeración con "and" al final. */
+function recEnumerar(items) {
+  if (items.length <= 1) return items[0] || "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
 /**
- * Una línea explicando el criterio: el patrón más pasado de rosca y el que la
- * sesión viene a levantar. Sin esto el botón es una caja negra.
+ * El porqué en prosa. Sin esto el botón es una caja negra: se ve QUÉ propone
+ * pero no CONTRA QUÉ, que es lo único que hace que valga la pena confiarle la
+ * sesión. Cada frase sale de `balanceActual` y `contexto`, no hay nada
+ * calculado de nuevo acá.
  */
-function recPorQue(data) {
+function recNarrativa(data) {
+  const balance = data.balanceActual || [];
+  const trabajo = data.recomendacion?.trabajo || [];
+  const ctx = data.contexto || {};
+  if (!balance.length || !trabajo.length) return [];
+
+  const porPatron = new Map(balance.map((b) => [b.patron, b]));
+  const sesiones = ctx.sesionesEnVentana ?? 0;
+  const objetivo = recPct(balance[0]?.target ?? 0.25);
+  const frases = [];
+
+  // Slots que se llevó cada patrón, en el orden en que los asignó el motor.
+  const slotsPorPatron = new Map();
+  trabajo.forEach((s) => slotsPorPatron.set(s.patron, (slotsPorPatron.get(s.patron) || 0) + 1));
+
+  // 1. Contra qué se está corrigiendo: el patrón que más espacio ocupa.
+  const masAlto = [...balance].sort((a, b) => b.share - a.share)[0];
+  if (masAlto && masAlto.share > masAlto.target) {
+    const afuera = !slotsPorPatron.has(masAlto.patron);
+    frases.push(
+      `${recLabel(masAlto.patron)} leads your last ${sesiones} sessions at ${recPct(masAlto.share)} against a ${objetivo} target` +
+        (afuera ? `, so it sits this one out.` : `, so it only gets what's left.`)
+    );
+  }
+
+  // 2. Qué entra y por qué. El déficit es lo que ordena el reparto.
+  const entran = [...slotsPorPatron.entries()].map(([patron, n]) => {
+    const b = porPatron.get(patron) || {};
+    return `${recLabel(patron)} at ${recPct(b.share)} (${n} slot${n > 1 ? "s" : ""})`;
+  });
+  if (entran.length) {
+    // La coletilla sólo se puede afirmar si TODOS los que entran están debajo
+    // del objetivo. Cuando la sesión cubre los 4 patrones — lo normal al volver
+    // de un parate — alguno está por arriba y decir "furthest below target"
+    // sería mentira.
+    const todosEnDeficit = [...slotsPorPatron.keys()].every(
+      (patron) => (porPatron.get(patron)?.deficit ?? 0) > 0
+    );
+    const cubreTodo = slotsPorPatron.size >= balance.length;
+
+    let cola = "";
+    if (cubreTodo) cola = ` — the whole board in one session.`;
+    else if (todosEnDeficit) cola = entran.length === 1 ? ` — the furthest below target.` : ` — the ones furthest below target.`;
+    else cola = `.`;
+
+    frases.push(`Today goes to ${recEnumerar(entran)}${cola}`);
+  }
+
+  // 3. El correctivo, que se apaga solo al llegar al objetivo.
+  const conCorrectivo = [...new Set(
+    trabajo.filter((s) => s.porQue?.correctivoAplicado).map((s) => s.patron)
+  )];
+  if (conCorrectivo.length) {
+    frases.push(
+      `${recEnumerar(conCorrectivo.map(recLabel))} also carries an extra push that switches itself off once it reaches ${objetivo}.`
+    );
+  }
+
+  // 4. Descanso. Tras un parate la frescura deja de discriminar y decide el
+  //    balance solo — vale decirlo, porque cambia qué está mirando el motor.
+  const dias = ctx.diasDesdeUltimoEntrenamiento;
+  if (ctx.vueltaDeParate && dias !== null && dias !== undefined) {
+    frases.push(`It's been ${dias} days since you trained, so everything is rested — this is balance alone, not recovery.`);
+  }
+
+  // 5. Novedad.
+  if (ctx.cupoNovedadUsado > 0) {
+    frases.push(
+      ctx.cupoNovedadUsado === 1
+        ? `One of these you've never done.`
+        : `${ctx.cupoNovedadUsado} of these you've never done.`
+    );
+  }
+
+  return frases;
+}
+
+/**
+ * El balance en barras: cada patrón contra el objetivo del 25%. Es la misma
+ * información que la prosa, pero de un vistazo se ve cuánto falta y para dónde.
+ */
+function recBalanceChart(data) {
   const balance = [...(data.balanceActual || [])].sort((a, b) => b.share - a.share);
-  if (!balance.length) return "";
+  if (!balance.length) return null;
 
-  const pct = (n) => `${Math.round(n * 100)}%`;
-  const sobrante = balance[0];
-  const patrones = [...new Set((data.recomendacion?.trabajo || []).map((s) => s.patron))]
-    .map((p) => REC_PATRON_LABEL[p] || p);
+  const trabajo = data.recomendacion?.trabajo || [];
+  const enSesion = new Set(trabajo.map((s) => s.patron));
+  const objetivo = balance[0]?.target ?? 0.25;
 
-  if (!patrones.length) return "";
+  // Escala común para las 4 barras, con aire arriba para que la más larga no
+  // toque el borde y el tick del objetivo quede siempre adentro.
+  const escala = Math.max(...balance.map((b) => b.share || 0), objetivo) * 1.12 || 1;
 
-  const objetivo = pct(sobrante.target ?? 0.25);
-  return `${patrones.join(" + ")} today — ${REC_PATRON_LABEL[sobrante.patron] || sobrante.patron} is at ${pct(sobrante.share)} of your last ${data.contexto?.sesionesEnVentana ?? 12} sessions vs a ${objetivo} target.`;
+  const wrap = document.createElement("div");
+  wrap.className = "rec-balance";
+
+  balance.forEach((b) => {
+    const fila = document.createElement("div");
+    fila.className = "rec-bal" + (enSesion.has(b.patron) ? " rec-bal--in" : "");
+
+    const name = document.createElement("span");
+    name.className = "rec-bal__name";
+    name.textContent = recLabel(b.patron);
+    fila.appendChild(name);
+
+    const track = document.createElement("span");
+    track.className = "rec-bal__track";
+
+    const fill = document.createElement("span");
+    fill.className = "rec-bal__fill";
+    fill.style.width = `${((b.share || 0) / escala) * 100}%`;
+    track.appendChild(fill);
+
+    const tick = document.createElement("span");
+    tick.className = "rec-bal__target";
+    tick.style.left = `${(objetivo / escala) * 100}%`;
+    tick.setAttribute("title", `Target ${recPct(objetivo)}`);
+    track.appendChild(tick);
+
+    fila.appendChild(track);
+
+    const val = document.createElement("span");
+    val.className = "rec-bal__pct";
+    val.textContent = recPct(b.share);
+    fila.appendChild(val);
+
+    wrap.appendChild(fila);
+  });
+
+  const pie = document.createElement("p");
+  pie.className = "rec-balance__foot";
+  pie.textContent = `Share of the last ${data.contexto?.sesionesEnVentana ?? 0} sessions · the line marks the ${recPct(objetivo)} target`;
+  wrap.appendChild(pie);
+
+  return wrap;
 }
 
 /** Pinta el resultado: la línea de criterio y las filas agrupadas por bloque. */
@@ -865,13 +998,21 @@ function renderRecommendation(data) {
   box.replaceChildren();
   box.hidden = false;
 
-  const porQue = recPorQue(data);
-  if (porQue) {
-    const p = document.createElement("p");
-    p.className = "rec-why";
-    p.textContent = porQue;
-    box.appendChild(p);
+  const frases = recNarrativa(data);
+  if (frases.length) {
+    const why = document.createElement("div");
+    why.className = "rec-why";
+    frases.forEach((texto) => {
+      const p = document.createElement("p");
+      p.className = "rec-why__line";
+      p.textContent = texto;
+      why.appendChild(p);
+    });
+    box.appendChild(why);
   }
+
+  const chart = recBalanceChart(data);
+  if (chart) box.appendChild(chart);
 
   // Avisos que cambian cuánto confiar en la recomendación. Sólo aparecen cuando
   // aplican, así que en el caso normal el panel queda limpio.

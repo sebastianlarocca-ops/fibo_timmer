@@ -10,7 +10,7 @@
  * Bump CACHE_NAME when you change precached files so clients pick up updates.
  */
 
-const CACHE_NAME = "workout-timer-pwa-v25";
+const CACHE_NAME = "workout-timer-pwa-v26";
 
 /** Paths relative to the service worker scope (usually site root). */
 const PRECACHE_URLS = [
