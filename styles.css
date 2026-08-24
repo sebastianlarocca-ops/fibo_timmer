@@ -191,6 +191,59 @@ h1 {
 }
 
 /* ── Session plan bar ────────────────────────────────────────── */
+/* ── Tipo de sesión ─────────────────────────────────────────────
+   Segmentado con el mismo patrón que .nav-pills. El verde (--rest) marca
+   running para que se distinga del naranja de marca de un vistazo. */
+.session-type {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 0.9rem;
+  background: rgba(255,255,255,0.05);
+  border-radius: 999px;
+}
+
+.session-type__btn {
+  flex: 1;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+
+.session-type__btn--active {
+  color: #111;
+  background: #fff;
+}
+
+.session-type__btn[data-session-type="running"].session-type__btn--active {
+  background: var(--rest);
+}
+
+.session-type__btn:hover:not(.session-type__btn--active) {
+  color: var(--fg);
+}
+
+.session-running-note {
+  margin: 0 0 1.25rem;
+  padding: 14px 16px;
+  border: 1px solid rgba(44,207,180,0.28);
+  border-radius: var(--r-lg);
+  background: rgba(44,207,180,0.07);
+  color: var(--fg-mute);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
 .session-plan-bar {
   display: flex;
   align-items: center;
@@ -1858,6 +1911,47 @@ h1 {
   margin-top: 2px;
 }
 
+/* ── Running ────────────────────────────────────────────────────
+   Verde mientras la cadencia esté al día; pasado el objetivo de ~10 días la
+   card se pone naranja sola. Es la única señal de "te toca correr". */
+.dash-card--running {
+  border-color: rgba(44,207,180,0.22);
+  background: linear-gradient(135deg, rgba(44,207,180,0.06), var(--surface));
+}
+.dash-card--running .dash-card__value { color: var(--rest); }
+
+.dash-card--running-due {
+  border-color: rgba(255,106,44,0.3);
+  background: linear-gradient(135deg, rgba(255,106,44,0.07), var(--surface));
+}
+.dash-card--running-due .dash-card__value { color: var(--work); }
+
+/* Fila del historial que reemplaza a la tabla Core/BD/OV. */
+.dash-run-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 2px;
+}
+
+.dash-run-row__badge {
+  padding: 3px 8px;
+  border: 1px solid rgba(44,207,180,0.35);
+  border-radius: 6px;
+  background: rgba(44,207,180,0.1);
+  color: var(--rest);
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.dash-run-row__text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-mute);
+}
+
 /* Dashboard loading */
 @keyframes dash-pulse {
   0%, 100% { opacity: 1; }
@@ -1915,6 +2009,10 @@ h1 {
   border-radius: 999px;
   background: rgba(255,255,255,0.06);
   overflow: hidden;
+  /* Barra apilada: fuerza + running, separadas por un hueco. El hueco evita
+     tener que cuadrar los redondeos de dos tramos pegados. */
+  display: flex;
+  gap: 3px;
 }
 
 .dash-month__bar {
@@ -1924,6 +2022,37 @@ h1 {
   background: var(--work);
   transition: width 0.25s ease;
 }
+
+.dash-month__bar--run { background: var(--rest); }
+
+/* Referencia de colores de la barra apilada */
+.dash-months__legend {
+  display: flex;
+  gap: 0.9rem;
+  margin: -0.4rem 0 0.75rem;
+}
+
+.dash-months__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.dash-months__key::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.dash-months__key--strength::before { background: var(--work); }
+.dash-months__key--run::before      { background: var(--rest); }
 
 .dash-month__count {
   font-family: var(--font-num);

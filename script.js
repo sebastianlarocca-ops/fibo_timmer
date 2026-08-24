@@ -594,6 +594,10 @@ function getFibonacciCurrentExerciseLine(timer) {
   const current = timer.sequence[timer.currentIndex];
   if (current.type === "rest") return "Rest";
 
+  // Corriendo no hay bloques que nombrar: los cinco tramos de trabajo son lo
+  // mismo, y el número de bloque ya lo muestra el encabezado.
+  if (isRunningSession()) return "Run";
+
   const d = current.durationSec;
   if (d === 60 || d === 120) return "Warm-up";
 
@@ -1359,6 +1363,53 @@ function initRecHelp() {
   });
 }
 
+// ── Tipo de sesión ────────────────────────────────────────────────────────
+//
+// "strength" es la sesión de siempre; "running" es el día de correr que va
+// intercalado cada ~10 días. El timer no distingue: mismos bloques, mismos
+// descansos, mismos sonidos. Lo único que cambia es que running no lleva plan
+// de ejercicios y se guarda con `type: "running"`.
+//
+// El estado vive sólo en memoria a propósito. No se sincroniza a la DB (el
+// plan de `currentworkouts` es de fuerza) y tampoco se persiste en
+// localStorage: un reload resetea el timer igual, así que dejarlo guardado
+// sólo serviría para amanecer en modo running sin haberlo elegido.
+
+const SESSION_TYPES = ["strength", "running"];
+let sessionType = "strength";
+
+const isRunningSession = () => sessionType === "running";
+
+function setSessionType(type) {
+  if (!SESSION_TYPES.includes(type)) return;
+  sessionType = type;
+
+  document.querySelectorAll("[data-session-type]").forEach((btn) => {
+    const activo = btn.getAttribute("data-session-type") === type;
+    btn.classList.toggle("session-type__btn--active", activo);
+    btn.setAttribute("aria-pressed", String(activo));
+  });
+
+  const running = isRunningSession();
+  const campos = document.getElementById("fibExerciseFields");
+  const rec    = document.getElementById("recSection");
+  const nota   = document.getElementById("sessionRunningNote");
+  if (campos) campos.hidden = running;
+  if (rec)    rec.hidden    = running;
+  if (nota)   nota.hidden   = !running;
+
+  updateSessionPlanSummary();
+}
+
+function initSessionType() {
+  document.querySelectorAll("[data-session-type]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setSessionType(btn.getAttribute("data-session-type"));
+    });
+  });
+  setSessionType(sessionType);
+}
+
 function initSuggestPlan() {
   const btn = document.getElementById("suggestPlanBtn");
   if (!btn) return;
@@ -1549,11 +1600,25 @@ function clearPendingCompletion() {
 function handleFibonacciComplete() {
   const snapshot = {
     date: new Date().toISOString(),
+    type: sessionType,
     core: [...fibExerciseLists.core],
     bodyweight: [...fibExerciseLists.bodyweight],
     overload: [...fibExerciseLists.overload],
     durationSec: FIB_TOTAL_SEC,
   };
+
+  // Una running se postea sola: no hay ejercicios que registrar ni carga que
+  // cargar. El plan de fuerza se limpia igual que en cualquier sesión — se
+  // arma sesión a sesión, así que no hay nada que preservar.
+  if (isRunningSession()) {
+    clearCurrentWorkoutCollection();
+    resetFibExercisePlan();
+    setSessionType("strength");
+    // Las listas se vacían acá además de en el backend: si quedó un plan a
+    // medio armar de una sesión anterior, no tiene por qué viajar.
+    saveCompletedWorkoutToAPI({ ...snapshot, core: [], bodyweight: [], overload: [] });
+    return;
+  }
 
   // El plan (DB + local) se limpia igual que antes: el snapshot ya tiene los
   // nombres, así que la pantalla de setup queda lista para la próxima sesión.
@@ -2116,6 +2181,11 @@ const FIB_BLOCK_LABELS = {
 function renderFibSummary() {
   if (!fibSummaryBody) return;
 
+  // Una running no tiene plan: el desplegable quedaría con tres bloques vacíos
+  // y un "—" en cada uno, que es peor que no estar.
+  if (fibSummaryEl) fibSummaryEl.hidden = isRunningSession();
+  if (isRunningSession()) return;
+
   // Collapsed label — list non-empty blocks
   const filled = FIB_BLOCK_TYPES.filter((t) => fibExerciseLists[t].length > 0);
   if (fibSummaryLabel) {
@@ -2271,6 +2341,52 @@ function dashDaysSince(isoStr) {
   return Math.floor((Date.now() - new Date(isoStr).getTime()) / 86_400_000);
 }
 
+/**
+ * Los documentos guardados antes de que existiera el campo son todos de fuerza:
+ * la ausencia de `type` no es un dato faltante, es el caso viejo.
+ */
+function esRunning(workout) {
+  return (workout.type || "strength") === "running";
+}
+
+/** Ventana de la métrica de running. Con una corrida cada ~10 días son ~6 datos. */
+const RUN_WINDOW_DAYS = 60;
+
+/**
+ * Cadencia de las corridas, no porcentaje.
+ *
+ * El objetivo está expresado en días ("una cada ~10"), y un % sobre el total de
+ * sesiones no lo mide: sube y baja cuando cambia la frecuencia de fuerza, sin
+ * que la conducta que se quiere controlar se haya movido.
+ *
+ * `avgGapDays` promedia los huecos entre corridas consecutivas que CIERRAN
+ * dentro de la ventana. Mirar el hueco y no la corrida es lo que hace que una
+ * sola corrida en los últimos 60 días ya tenga cadencia: su hueco cuenta aunque
+ * la corrida anterior sea más vieja que la ventana.
+ */
+function computeRunningStats(workouts) {
+  const runs = workouts
+    .filter(esRunning)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (!runs.length) return null;
+
+  const since = Date.now() - RUN_WINDOW_DAYS * 86_400_000;
+  const gaps = [];
+  for (let i = 1; i < runs.length; i++) {
+    const fin = new Date(runs[i].date).getTime();
+    if (fin < since) continue;
+    gaps.push((fin - new Date(runs[i - 1].date).getTime()) / 86_400_000);
+  }
+
+  return {
+    total:         runs.length,
+    inWindow:      runs.filter((w) => new Date(w.date).getTime() >= since).length,
+    daysSinceLast: dashDaysSince(runs[runs.length - 1].date),
+    avgGapDays:    gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null,
+  };
+}
+
 function dashMonthKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -2279,7 +2395,7 @@ function dashMonthKey(d) {
  * Últimos 6 meses (el actual incluido), del más viejo al más nuevo:
  * [{ key, label, count }]
  */
-function lastSixMonths(byMonth) {
+function lastSixMonths(byMonth, runningByMonth = {}) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const out = [];
@@ -2294,6 +2410,7 @@ function lastSixMonths(byMonth) {
         ? short
         : `${short} '${String(d.getFullYear()).slice(-2)}`,
       count: byMonth[key] ?? 0,
+      running: runningByMonth[key] ?? 0,
     });
   }
   return out;
@@ -2306,6 +2423,11 @@ function groupByMonth(workouts) {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+}
+
+/** Mismo agrupado, sólo con las corridas: alimenta el tramo verde de las barras. */
+function groupRunningByMonth(workouts) {
+  return groupByMonth(workouts.filter(esRunning));
 }
 
 /** Returns { "YYYY-MM-DD": { date, core[], bodyweight[], overload[] } } */
@@ -2450,18 +2572,27 @@ function computeDashStats(workouts) {
   const byMonth = groupByMonth(workouts);
 
   // Promedio sobre los 6 meses listados (el actual, parcial, incluido)
-  const months = lastSixMonths(byMonth);
+  const months = lastSixMonths(byMonth, groupRunningByMonth(workouts));
   const total  = months.reduce((sum, m) => sum + m.count, 0);
+
+  // Running suma en los totales — es una sesión de entrenamiento como
+  // cualquier otra — pero se muestra desglosado para que el número de fuerza
+  // siga siendo legible de un vistazo.
+  const thisMonthRunning = workouts.filter(
+    (w) => esRunning(w) && dashMonthKey(new Date(w.date)) === curKey
+  ).length;
 
   return {
     firstDate:      sorted[0].date,
     lastDate:       sorted[sorted.length - 1].date,
     daysSinceLast:  dashDaysSince(sorted[sorted.length - 1].date),
     thisMonthCount: byMonth[curKey] ?? 0,
+    thisMonthRunning,
     streak:         calcStreak(workouts),
     byMonth,
     months,
     avgPerMonth:    total / months.length,
+    running:        computeRunningStats(workouts),
   };
 }
 
@@ -2524,7 +2655,12 @@ function computePatronBalance(workouts, patronesByName) {
   if (!patronesByName) return null;
 
   const since  = Date.now() - PATRON_WINDOW_DAYS * 86_400_000;
-  const recent = workouts.filter((w) => new Date(w.date).getTime() >= since);
+  // Las running quedan afuera del conteo: no aportan ejercicios, así que
+  // incluirlas sólo inflaría el "N workouts" del encabezado y haría creer que
+  // el reparto se calculó sobre más volumen del que realmente hubo.
+  const recent = workouts.filter(
+    (w) => new Date(w.date).getTime() >= since && !esRunning(w)
+  );
 
   const blocks = PATRON_BLOCKS.map(({ key, label }) => {
     const weights = {};
@@ -2592,9 +2728,26 @@ function renderDashMonths(months) {
   list.replaceChildren();
   const max = Math.max(...months.map((m) => m.count), 1);
 
-  months.forEach(({ label, count }) => {
+  // La barra se parte en fuerza + running. Sin esto el gráfico compararía cosas
+  // distintas entre sí: los meses previos a que empezara a correr son fuerza
+  // pura, y a partir de ahí ~3 sesiones más por mes harían ver como progreso
+  // algo que es sólo un cambio en qué se está contando.
+  const hayRunning = months.some((m) => m.running > 0);
+
+  /** Un tramo de la barra. El piso de 4% existe para que 1 sesión se vea. */
+  const segmento = (cantidad, clase) => {
+    const bar = document.createElement("span");
+    bar.className = clase;
+    bar.style.width = `${Math.max((cantidad / max) * 100, 4)}%`;
+    return bar;
+  };
+
+  months.forEach(({ label, count, running }) => {
+    const fuerza = count - running;
+
     const li = document.createElement("li");
     li.className = "dash-month";
+    if (running) li.title = `${fuerza} strength · ${running} running`;
 
     const name = document.createElement("span");
     name.className = "dash-month__label";
@@ -2602,11 +2755,11 @@ function renderDashMonths(months) {
 
     const track = document.createElement("span");
     track.className = "dash-month__track";
-    const bar = document.createElement("span");
-    bar.className = "dash-month__bar";
-    // los meses sin entrenamientos quedan con la barra vacía
-    bar.style.width = count ? `${Math.max((count / max) * 100, 4)}%` : "0";
-    track.appendChild(bar);
+    // Los meses sin entrenamientos quedan con el track vacío, sin tramos.
+    if (fuerza > 0) track.appendChild(segmento(fuerza, "dash-month__bar"));
+    if (running > 0) {
+      track.appendChild(segmento(running, "dash-month__bar dash-month__bar--run"));
+    }
 
     const value = document.createElement("span");
     value.className = "dash-month__count";
@@ -2615,6 +2768,11 @@ function renderDashMonths(months) {
     li.append(name, track, value);
     list.appendChild(li);
   });
+
+  // La referencia sólo aparece cuando hay algo que referenciar: en un histórico
+  // sin corridas, dos chips explicando un único color son ruido.
+  const legend = document.getElementById("dashMonthsLegend");
+  if (legend) legend.hidden = !hayRunning;
 }
 
 /** Reparto de patrones por bloque, una lista de barras por bloque. */
@@ -2752,6 +2910,10 @@ function renderDashboard(workouts, patronesByName) {
   setDashText("dashAvgPerMonth", Number.isInteger(s.avgPerMonth)
     ? s.avgPerMonth
     : s.avgPerMonth.toFixed(1));
+  setDashText("dashMonthSub", s.thisMonthRunning
+    ? `${s.thisMonthCount - s.thisMonthRunning} strength · ${s.thisMonthRunning} running`
+    : "workouts logged");
+  renderRunningCard(s.running);
 
   renderDashMonths(s.months);
   renderPatronBalance(computePatronBalance(workouts, patronesByName));
@@ -2781,7 +2943,9 @@ function renderDashboard(workouts, patronesByName) {
       // Con una sola sesión el botón entra en la línea de la fecha; con varias,
       // cada una lleva el suyo junto a su hora.
       const variasSesiones = dayWorkouts.length > 1;
-      if (!variasSesiones) head.appendChild(buildEditButton(dayWorkouts[0]));
+      if (!variasSesiones && !esRunning(dayWorkouts[0])) {
+        head.appendChild(buildEditButton(dayWorkouts[0]));
+      }
 
       li.appendChild(head);
       dayWorkouts.forEach((w) => {
@@ -2790,6 +2954,38 @@ function renderDashboard(workouts, patronesByName) {
       });
       historyList.appendChild(li);
     });
+}
+
+/**
+ * Card de running. Arriba la cadencia — el número que se compara contra el
+ * objetivo de "una cada ~10 días" — y abajo el contexto: hace cuánto fue la
+ * última y cuántas entraron en la ventana.
+ *
+ * Con una sola corrida en el histórico todavía no hay hueco que promediar y la
+ * cadencia queda en "—": mejor un guion que un promedio inventado sobre un dato.
+ */
+function renderRunningCard(run) {
+  const card = document.getElementById("dashRunningCard");
+  if (!card) return;
+
+  if (!run) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+
+  setDashText("dashRunCadence", run.avgGapDays === null
+    ? "—"
+    : `every ${run.avgGapDays.toFixed(1)} d`);
+
+  const ultima = run.daysSinceLast === 0 ? "last run today" : `last run ${run.daysSinceLast}d ago`;
+  const ventana = run.inWindow
+    ? `${run.inWindow} in ${RUN_WINDOW_DAYS}d`
+    : `none in ${RUN_WINDOW_DAYS}d`;
+  setDashText("dashRunSub", `${ultima} · ${ventana}`);
+
+  // El objetivo es una cada ~10 días: pasado ese punto la card avisa sola.
+  card.classList.toggle("dash-card--running-due", run.daysSinceLast >= 10);
 }
 
 /** Botón que abre el formulario de carga sobre un workout ya guardado. */
@@ -2828,12 +3024,32 @@ function buildWorkoutBlock(workout, conBarra) {
       minute: "2-digit",
     });
 
-    bar.append(time, buildEditButton(workout));
+    bar.append(time);
+    if (!esRunning(workout)) bar.appendChild(buildEditButton(workout));
     wrap.appendChild(bar);
   }
 
-  wrap.appendChild(buildWorkoutTable(workout));
+  // Una running no tiene ejercicios: la tabla Core/BD/OV serían tres columnas
+  // de guiones. Va una fila propia, que además la hace reconocible al scrollear.
+  wrap.appendChild(esRunning(workout) ? buildRunningRow() : buildWorkoutTable(workout));
   return wrap;
+}
+
+/** Fila que reemplaza a la tabla en las sesiones de running. */
+function buildRunningRow() {
+  const row = document.createElement("div");
+  row.className = "dash-run-row";
+
+  const badge = document.createElement("span");
+  badge.className = "dash-run-row__badge";
+  badge.textContent = "RUN";
+
+  const text = document.createElement("span");
+  text.className = "dash-run-row__text";
+  text.textContent = `Running session · ${Math.round(FIB_TOTAL_SEC / 60)} min`;
+
+  row.append(badge, text);
+  return row;
 }
 
 /** Tabla de un workout: Core / BD / OV, con las vueltas en el encabezado y la
@@ -3941,10 +4157,16 @@ function updateTabataFibTimeMirror() {
 function updateSessionPlanSummary() {
   const el = document.getElementById("sessionPlanSummary");
   if (!el) return;
-  const total = FIB_BLOCK_TYPES.reduce((n, t) => n + fibExerciseLists[t].length, 0);
   // Derivado de FIB_SEQUENCE, no hardcodeado: es la duración real de la sesión
   // completa (23 min), que es lo que el usuario va a estar entrenando.
   const mins = Math.round(FIB_TOTAL_SEC / 60);
+
+  if (isRunningSession()) {
+    el.textContent = `RUNNING · ${mins} MIN`;
+    return;
+  }
+
+  const total = FIB_BLOCK_TYPES.reduce((n, t) => n + fibExerciseLists[t].length, 0);
   el.textContent = `${total} EXERCISE${total !== 1 ? "S" : ""} · ${mins} MIN`;
 }
 
@@ -4071,6 +4293,7 @@ function bootstrap() {
   initExerciseAddForm();
   initSuggestPlan();
   initRecHelp();
+  initSessionType();
 
   // 2. Primer render
   fibonacciResetUi();

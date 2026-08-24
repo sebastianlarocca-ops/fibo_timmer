@@ -145,6 +145,8 @@ router.get("/history", async (req, res) => {
         date: new Date(w.date).toISOString(),
         daysAgo: daysAgo(w.date, now),
         durationSec: w.durationSec ?? null,
+        // Los documentos viejos no tienen el campo: son todos de fuerza.
+        type: w.type || "strength",
         core: w.core || [],
         bodyweight: w.bodyweight || [],
         overload: w.overload || [],
@@ -355,8 +357,17 @@ router.get("/recommendation", async (req, res) => {
   try {
     const params = readParams(req.query);
 
+    // Las sesiones de running quedan afuera del motor. No traen ejercicios, así
+    // que dentro de la ventana de N sesiones sólo gastarían un slot y diluirían
+    // el balance de patrones: correr no descansa ni trabaja ningún patrón de
+    // fuerza. `$ne` en vez de `$eq: "strength"` porque los documentos viejos no
+    // tienen el campo.
     const [workouts, exercises] = await Promise.all([
-      Workout.find().sort({ date: -1 }).limit(1000).select("date core bodyweight overload").lean(),
+      Workout.find({ type: { $ne: "running" } })
+        .sort({ date: -1 })
+        .limit(1000)
+        .select("date core bodyweight overload")
+        .lean(),
       Exercise.find().select("name patrones modalidad lastPerformed daysPerformed link -_id").lean(),
     ]);
 

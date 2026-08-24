@@ -41,6 +41,7 @@ const performanceSchema = new mongoose.Schema(
  * Fields
  * ------
  * date        – when the workout finished (stored in UTC, indexed for sorting)
+ * type        – "strength" (la sesión de siempre) o "running" (día de correr)
  * core        – exercises shown during the 3-minute block
  * bodyweight  – exercises shown during the 5-minute block
  * overload    – exercises shown during the 8-minute block
@@ -53,6 +54,20 @@ const workoutSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
       required: true,
+      index: true,
+    },
+    /**
+     * Qué clase de sesión fue. El timer es el mismo en las dos — mismos bloques,
+     * mismos descansos, mismos 23 minutos — pero una running no lleva ejercicios
+     * ni carga, así que se guarda con las tres listas vacías.
+     *
+     * `default` cubre a los documentos viejos: todo lo guardado antes de que
+     * existiera este campo era, por definición, una sesión de fuerza.
+     */
+    type: {
+      type: String,
+      enum: ["strength", "running"],
+      default: "strength",
       index: true,
     },
     core: {

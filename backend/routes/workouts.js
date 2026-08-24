@@ -67,6 +67,11 @@ router.post("/", async (req, res) => {
   try {
     const { date, core, bodyweight, overload, durationSec, performance } = req.body;
 
+    // Cualquier cosa que no sea "running" es una sesión de fuerza: el default
+    // tiene que ser el caso viejo para que un cliente sin actualizar siga
+    // guardando lo mismo de siempre.
+    const esRunning = req.body.type === "running";
+
     // Basic structural validation
     if (
       !Array.isArray(core) ||
@@ -78,18 +83,35 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // Una running no tiene ejercicios ni carga. Se descartan acá y no en el
+    // cliente para que el tipo sea la única fuente de verdad: un doc con
+    // type:"running" nunca puede traer ejercicios que ensucien el balance de
+    // patrones ni el catálogo de ejercicios.
     const workout = new Workout({
       date: date ? new Date(date) : new Date(),
-      core: core.map(String),
-      bodyweight: bodyweight.map(String),
-      overload: overload.map(String),
+      type: esRunning ? "running" : "strength",
+      core: esRunning ? [] : core.map(String),
+      bodyweight: esRunning ? [] : bodyweight.map(String),
+      overload: esRunning ? [] : overload.map(String),
       durationSec: typeof durationSec === "number" ? durationSec : null,
-      performance: sanitizePerformance(performance),
+      performance: esRunning ? undefined : sanitizePerformance(performance),
     });
 
     const saved = await workout.save();
 
-    console.log(`[workout saved] id=${saved._id}  date=${saved.date.toISOString()}`);
+    console.log(
+      `[workout saved] id=${saved._id}  type=${saved.type}  date=${saved.date.toISOString()}`
+    );
+
+    // Sin ejercicios no hay nada que upsertear: una running no toca el catálogo.
+    if (esRunning) {
+      return res.status(201).json({
+        message: "Workout saved successfully.",
+        id: saved._id,
+        date: saved.date,
+        type: saved.type,
+      });
+    }
 
     // Upsert exercises with latest stats (lowercase, deduplicated).
     // `modalidad` = bloque en el que se cargó el ejercicio en esta sesión.
@@ -125,6 +147,7 @@ router.post("/", async (req, res) => {
       message: "Workout saved successfully.",
       id: saved._id,
       date: saved.date,
+      type: saved.type,
     });
   } catch (err) {
     console.error("[POST /api/workouts] error:", err.message);

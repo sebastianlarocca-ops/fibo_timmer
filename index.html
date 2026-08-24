@@ -43,15 +43,31 @@
         <!-- ── SETUP MODE ─────────────────────────────────────────── -->
         <div class="fib-exercise-setup" aria-label="Exercises for 3, 5, and 8 minute work blocks">
 
+          <!-- Tipo de sesión. El timer es idéntico en las dos: lo único que
+               cambia es que running no lleva plan de ejercicios y se guarda
+               con type:"running". -->
+          <div class="session-type" role="group" aria-label="Session type">
+            <button type="button" class="session-type__btn session-type__btn--active"
+              data-session-type="strength" aria-pressed="true">Strength</button>
+            <button type="button" class="session-type__btn"
+              data-session-type="running" aria-pressed="false">Running</button>
+          </div>
+
           <div class="session-plan-bar">
             <span class="session-plan-bar__label">SESSION PLAN</span>
             <span class="session-plan-bar__summary" id="sessionPlanSummary">0 EXERCISES · 16 MIN</span>
           </div>
 
+          <!-- Lo que ve una running en lugar del plan: el timer no cambia, así
+               que no hay nada que configurar. -->
+          <p class="session-running-note" id="sessionRunningNote" hidden>
+            Same intervals, no exercises to plan. Hit start and go.
+          </p>
+
           <!-- Recomendación por balance de patrones. Las filas que pinta
                renderRecommendation() se agregan al plan con un click, igual que
                las de la pestaña List. -->
-          <div class="rec">
+          <div class="rec" id="recSection">
             <div class="rec-actions">
               <button type="button" id="suggestPlanBtn" class="rec-btn"
                 aria-expanded="false" aria-controls="recResult">
@@ -63,7 +79,7 @@
             <div id="recResult" class="rec-result" hidden aria-live="polite"></div>
           </div>
 
-          <div class="fib-exercise-fields">
+          <div class="fib-exercise-fields" id="fibExerciseFields">
 
             <div class="fib-exercise-block" data-fib-block="core">
               <div class="fib-exercise-block__label">
@@ -294,7 +310,7 @@
           <div class="dash-card dash-card--highlight">
             <span class="dash-card__label">This month</span>
             <span class="dash-card__value" id="dashMonthCount">—</span>
-            <span class="dash-card__sub">workouts logged</span>
+            <span class="dash-card__sub" id="dashMonthSub">workouts logged</span>
           </div>
           <div class="dash-card">
             <span class="dash-card__label">Last Workout</span>
@@ -305,10 +321,24 @@
             <span class="dash-card__value" id="dashAvgPerMonth">—</span>
             <span class="dash-card__sub">workouts per month · last 6 months</span>
           </div>
+          <!-- Cadencia, no porcentaje: el objetivo está expresado en días
+               ("una cada ~10"), y un % sobre el total de sesiones se mueve
+               solo cuando cambia la frecuencia de fuerza. -->
+          <div class="dash-card dash-card--wide dash-card--running" id="dashRunningCard" hidden>
+            <span class="dash-card__label">Running</span>
+            <span class="dash-card__value" id="dashRunCadence">—</span>
+            <span class="dash-card__sub" id="dashRunSub"></span>
+          </div>
         </div>
 
         <section class="dash-months" id="dashMonths">
           <h2 class="dash-history__title">Last 6 months</h2>
+          <!-- Sólo se muestra cuando hay corridas en la ventana; lo decide
+               renderDashMonths(). -->
+          <p class="dash-months__legend" id="dashMonthsLegend" hidden>
+            <span class="dash-months__key dash-months__key--strength">Strength</span>
+            <span class="dash-months__key dash-months__key--run">Running</span>
+          </p>
           <ul id="dashMonthsList" class="dash-months__list" aria-label="Workouts per month"></ul>
         </section>
 
