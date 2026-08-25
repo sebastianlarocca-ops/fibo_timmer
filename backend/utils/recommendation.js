@@ -43,6 +43,11 @@
  *                      movimientos desconocidos), después el más descansado.
  */
 
+const { diasDeCalendario } = require("./dias");
+
+// Sólo para las ventanas de "mirar hacia atrás N días" (maxAgeDays), donde lo que
+// importa es el largo del período y no en qué día cae el borde. Todo lo que se
+// muestra o alimenta el veto usa diasDeCalendario: ver utils/dias.js.
 const DIA_MS = 24 * 60 * 60 * 1000;
 
 // Los patrones que compiten por los slots de bodyweight/overload. `core` queda
@@ -244,7 +249,7 @@ function buildRecommendation(workouts, exercises, params, now) {
   PATRONES_BALANCE.forEach((p) => (lastSeenDays[p] = null));
 
   for (const w of workouts) {
-    const age = Math.floor((now - new Date(w.date).getTime()) / DIA_MS);
+    const age = diasDeCalendario(w.date, now);
     const enSesion = new Set();
     BLOQUES.forEach((bloque) =>
       (w[bloque] || []).forEach((raw) => patronesDe(raw).forEach((p) => enSesion.add(p)))
@@ -267,7 +272,7 @@ function buildRecommendation(workouts, exercises, params, now) {
   const patronesVetados = new Set();
   const ultimaSesion = workouts[0];
   if (ultimaSesion) {
-    const diasUltima = Math.floor((now - new Date(ultimaSesion.date).getTime()) / DIA_MS);
+    const diasUltima = diasDeCalendario(ultimaSesion.date, now);
     if (diasUltima <= params.vetoDays) {
       BLOQUES.forEach((bloque) =>
         (ultimaSesion[bloque] || []).forEach((raw) =>
@@ -328,9 +333,7 @@ function buildRecommendation(workouts, exercises, params, now) {
       })
       .map((ex) => {
         const esNuevo = (ex.daysPerformed || 0) === 0;
-        const dias = ex.lastPerformed
-          ? Math.floor((now - new Date(ex.lastPerformed).getTime()) / DIA_MS)
-          : null;
+        const dias = ex.lastPerformed ? diasDeCalendario(ex.lastPerformed, now) : null;
         return {
           name: ex.name,
           esNuevo,
@@ -369,9 +372,7 @@ function buildRecommendation(workouts, exercises, params, now) {
         esNuevo: (ex.daysPerformed || 0) === 0,
         patrones: ex.patrones || [],
         link: ex.link || null,
-        daysSinceLast: ex.lastPerformed
-          ? Math.floor((now - new Date(ex.lastPerformed).getTime()) / DIA_MS)
-          : null,
+        daysSinceLast: ex.lastPerformed ? diasDeCalendario(ex.lastPerformed, now) : null,
       }))
       .sort((a, b) => {
         const cupo = nuevosUsados < params.maxNew;
@@ -517,9 +518,7 @@ function buildRecommendation(workouts, exercises, params, now) {
   })).sort((a, b) => b.share - a.share);
 
   const ultima = workouts[0];
-  const diasDesdeUltimo = ultima
-    ? Math.floor((now - new Date(ultima.date).getTime()) / DIA_MS)
-    : null;
+  const diasDesdeUltimo = ultima ? diasDeCalendario(ultima.date, now) : null;
 
   return {
     generatedAt: new Date(now).toISOString(),

@@ -4,6 +4,7 @@ const router = express.Router();
 const Workout = require("../models/workout");
 const Exercise = require("../models/exercise");
 const { readParams, buildRecommendation } = require("../utils/recommendation");
+const { dayKey, diasDeCalendario } = require("../utils/dias");
 
 const PATRONES = Exercise.PATRONES; // empuje, traccion, rodilla_dominante, cadera_dominante, core
 const BLOQUES = ["core", "bodyweight", "overload"];
@@ -45,15 +46,12 @@ function toIntParam(value, { def, min, max }) {
   return Math.min(Math.max(n, min), max);
 }
 
-/** Fecha → "YYYY-MM-DD" en UTC. Sirve para agrupar por día. */
-function dayKey(date) {
-  return new Date(date).toISOString().slice(0, 10);
-}
-
-/** Días enteros transcurridos entre `date` y `now`. */
-function daysAgo(date, now) {
-  return Math.floor((now - new Date(date).getTime()) / DIA_MS);
-}
+/**
+ * Días de calendario en la zona del usuario, no bloques de 24h transcurridas.
+ * El porqué está en utils/dias.js; acá sólo se le pone el nombre que ya usaba
+ * el resto del archivo.
+ */
+const daysAgo = diasDeCalendario;
 
 function round(n, decimals = 2) {
   const f = 10 ** decimals;
