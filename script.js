@@ -2337,8 +2337,23 @@ function dashFormatDate(isoStr) {
   });
 }
 
+/**
+ * Días de calendario, no bloques de 24h.
+ *
+ * Con `Math.floor(elapsed / 86_400_000)` un entrenamiento del domingo a la noche
+ * seguía diciendo "1d ago" el martes a la tarde: habían pasado 42 horas, o sea
+ * un solo bloque completo. La tarjeta habla el mismo idioma que el historial,
+ * que rotula por fecha local ("SUN 23 AUG"), así que se cuentan medianoches.
+ *
+ * `round` y no `floor` sobre la resta de medianoches: en el cambio de horario un
+ * día dura 23 o 25 horas y el floor se comería uno.
+ */
 function dashDaysSince(isoStr) {
-  return Math.floor((Date.now() - new Date(isoStr).getTime()) / 86_400_000);
+  const d = new Date(isoStr);
+  const entonces = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const h = new Date();
+  const hoy = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  return Math.round((hoy - entonces) / 86_400_000);
 }
 
 /**
