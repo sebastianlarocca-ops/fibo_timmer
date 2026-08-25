@@ -3948,13 +3948,18 @@ function initExercisesModalidadFilter() {
  * form de alta): acá el objetivo es aislar un patrón para programar sobre él.
  * Volver a tocar el activo lo limpia.
  * Se pintan desde PATRON_ORDER para no desincronizarse del enum del backend.
+ * Core queda afuera: ya tiene su chip en la fila de modalidad de arriba.
  */
 function initExercisesPatronFilter() {
   const wrap = document.getElementById("exPatronFilters");
   if (!wrap) return;
 
   wrap.replaceChildren();
-  [{ value: "", label: "All" }, ...PATRON_ORDER.map((p) => ({ value: p, label: PATRON_LABELS[p] }))]
+  [
+    { value: "", label: "All" },
+    ...PATRON_ORDER.filter((p) => p !== "core")
+      .map((p) => ({ value: p, label: PATRON_LABELS[p] })),
+  ]
     .forEach(({ value, label }) => {
       const btn = document.createElement("button");
       btn.type = "button";
