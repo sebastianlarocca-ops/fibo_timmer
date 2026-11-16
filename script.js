@@ -209,6 +209,23 @@ function formatTime(totalSeconds) {
  * @param {number} [options.tickMs]
  */
 class WorkoutTimer {
+  /**
+   * Timers corriendo ahora mismo. Mientras haya alguno, la app Android
+   * mantiene la pantalla encendida (en la web `Native.setAwake` es no-op).
+   */
+  static _running = new Set();
+
+  static _syncAwake() {
+    if (window.Native) window.Native.setAwake(WorkoutTimer._running.size > 0);
+  }
+
+  _setRunning(on) {
+    this._isRunning = on;
+    if (on) WorkoutTimer._running.add(this);
+    else WorkoutTimer._running.delete(this);
+    WorkoutTimer._syncAwake();
+  }
+
   constructor(options) {
     this._getSequence = options.getSequence;
     this._onRender = options.onRender;
@@ -263,7 +280,7 @@ class WorkoutTimer {
 
   reset() {
     this._stopInterval();
-    this._isRunning = false;
+    this._setRunning(false);
     this._isComplete = false;
     this._currentIndex = 0;
     this._elapsedBeforePhaseSec = 0;
@@ -282,7 +299,7 @@ class WorkoutTimer {
     if (this._isRunning) return;
     if (!this._sequence.length) return;
 
-    this._isRunning = true;
+    this._setRunning(true);
     this._phaseEndTime = Date.now() + this._remainingMs;
 
     if (this._intervalId === null) {
@@ -293,7 +310,7 @@ class WorkoutTimer {
 
   pause() {
     if (!this._isRunning || this._isComplete) return;
-    this._isRunning = false;
+    this._setRunning(false);
     this._remainingMs = Math.max(0, this._phaseEndTime - Date.now());
     this._onRender(this);
   }
@@ -333,7 +350,7 @@ class WorkoutTimer {
   }
 
   _finish() {
-    this._isRunning = false;
+    this._setRunning(false);
     this._isComplete = true;
     this._remainingMs = 0;
     this._stopInterval();
@@ -2281,6 +2298,9 @@ let deferredInstallPrompt = null;
  */
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
+  // Adentro del APK los archivos ya son locales: el SW no aporta nada y su
+  // caché podría servir una versión vieja después de actualizar la app.
+  if (window.Native && window.Native.isNative) return;
 
   window.addEventListener("load", () => {
     const swUrl = new URL("service-worker.js", window.location.href);

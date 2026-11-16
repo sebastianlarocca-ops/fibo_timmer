@@ -2,3 +2,16 @@ v2/
 PRODUCTION_SPEC.md
 PRODUCTION_FEATURES.md
 serve.json
+
+# ─── App Android (Capacitor) ──────────────────────────────────────────
+# El sitio web no necesita nada de esto. `native.js` sí se publica: es
+# inerte en el navegador e index.html lo carga igual.
+www
+android
+scripts
+assets
+node_modules
+capacitor.config.json
+package.json
+package-lock.json
+ANDROID.md

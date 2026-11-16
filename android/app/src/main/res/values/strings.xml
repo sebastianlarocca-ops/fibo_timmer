@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Workout Timer</string>
+    <string name="title_activity_main">Workout Timer</string>
+    <string name="package_name">com.larocca.workout</string>
+    <string name="custom_url_scheme">com.larocca.workout</string>
+</resources>

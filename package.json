@@ -1,0 +1,22 @@
+{
+  "name": "workout-timer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App Android del Workout Timer. El sitio web es el mismo código, servido desde Vercel; esto solo lo empaqueta.",
+  "scripts": {
+    "www": "node scripts/build-www.mjs",
+    "sync": ". ./scripts/env.sh && npm run www && npx cap sync android",
+    "apk": ". ./scripts/env.sh && npm run sync && cd android && ./gradlew assembleRelease",
+    "install-apk": ". ./scripts/env.sh && adb install -r android/app/build/outputs/apk/release/app-release.apk",
+    "bump": "node scripts/bump-version.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "8.0.1",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "8.6.0"
+  }
+}

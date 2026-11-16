@@ -13,3 +13,20 @@ node_modules/
 # Local Netlify folder
 .netlify
 .vercel
+
+# App Android (Capacitor)
+# www/ es una copia generada de los archivos del sitio — nunca se edita a mano.
+www/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+
+# Firma del APK — NUNCA commitear. Sin la keystore no se puede actualizar la app.
+*.keystore
+*.jks
+android/keystore.properties
